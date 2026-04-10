@@ -268,8 +268,17 @@ def update_meal_window(meal_type: str, body: dict, current_user: dict = Depends(
         if not fields:
             raise HTTPException(status_code=400, detail="No valid fields provided")
 
-        set_clause = ", ".join(f"{k} = %s" for k in fields)
-        values = list(fields.values()) + [meal_type.upper()]
+        set_parts = []
+        values = []
+        for k, v in fields.items():
+            if k == "available_days":
+                set_parts.append("available_days = %s::int[]")
+            else:
+                set_parts.append(f"{k} = %s")
+            values.append(v)
+
+        set_clause = ", ".join(set_parts)
+        values.append(meal_type.upper())
 
         cur.execute(f"""
             UPDATE meal_windows SET {set_clause}
