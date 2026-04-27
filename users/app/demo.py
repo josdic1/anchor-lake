@@ -210,7 +210,8 @@ def seed_sample_data(cur, hashed_pw, admin_id):
     booking_count = 0
     current_date = start_date
 
-    while current_date <= today:
+    end_date = today + timedelta(days=7)
+    while current_date <= end_date:
         daily_count = random.randint(2, 5)
         used_rooms_lunch: set = set()
         used_rooms_dinner: set = set()
@@ -238,9 +239,11 @@ def seed_sample_data(cur, hashed_pw, admin_id):
 
             if current_date < today:
                 status = "COMPLETED"
-            else:
+            elif current_date == today:
                 status = random.choice(["CONFIRMED", "SEATED", "SERVICE", "CONFIRMED"])
-
+            else:
+                status = "CONFIRMED"
+                
             cur.execute("""
                 INSERT INTO bookings (
                     booking_member_id, room_id, booking_date, meal_type,
