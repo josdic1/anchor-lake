@@ -61,15 +61,25 @@ CREATE TYPE audit_action AS ENUM (
 -- =============================================================================
 
 CREATE TABLE tenant_config (
-    id            SERIAL PRIMARY KEY,
-    name          TEXT,
-    primary_color TEXT,
-    logo_url      TEXT,
-    features      JSONB,
-    tagline       TEXT,
-    font_display  TEXT,
-    font_body     TEXT,
-    font_url      TEXT
+    id               SERIAL PRIMARY KEY,
+    name             TEXT,
+    primary_color    TEXT,
+    logo_url         TEXT,
+    features         JSONB,
+    tagline          TEXT,
+    font_display     TEXT,
+    font_body        TEXT,
+    font_url         TEXT,
+    trial_expires_at TIMESTAMPTZ
+);
+
+INSERT INTO tenant_config (name, primary_color, logo_url, tagline, features)
+VALUES (
+    'My Club',
+    '#a38a64',
+    '',
+    'Member Portal',
+    '{"show_demo_login": true, "show_kitchen_board": true, "show_reports": true, "allow_member_booking": true, "allow_preorders": true, "show_dietary_flags": true}'::jsonb
 );
 
 -- =============================================================================

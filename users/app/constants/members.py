@@ -2,7 +2,7 @@
 # Seed data for member households.
 # PARTNER and PARENT mapped to OTHER (not in member_relation enum).
 # One user account per household, keyed on the PRIMARY member.
-# Emails: firstname.lastname@abeytonlodge.com (lowercase, no spaces)
+# Emails: firstname.lastname@demo.com (lowercase, no spaces)
 # Default password: 111111
 
 RELATION_MAP = {
@@ -128,7 +128,7 @@ def seed_members(cur, hash_password_fn) -> dict:
     """
     Insert all member households.
     Creates one user account per household (keyed on PRIMARY member).
-    Email format: firstname.lastname@abeytonlodge.com (lowercase).
+    Email format: firstname.lastname@demo.com (lowercase).
     Default password: 111111
     Returns summary: {"users_created": N, "members_created": N}
     """
@@ -141,7 +141,7 @@ def seed_members(cur, hash_password_fn) -> dict:
 
         first = primary["first_name"].lower()
         last = primary["last_name"].lower()
-        email = f"{first}.{last}@abeytonlodge.com"
+        email = f"{first}.{last}@demo.com"
         member_number = f"M{str(index + 1).zfill(4)}"
 
         cur.execute("""

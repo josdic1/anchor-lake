@@ -34,7 +34,26 @@ def get_public_config():
     try:
         cur.execute("SELECT * FROM tenant_config LIMIT 1;")
         config = cur.fetchone()
-        return config
+        if config is None:
+            return {
+                "name": "My Club",
+                "tagline": "Member Portal",
+                "primary_color": "#a38a64",
+                "logo_url": "",
+                "font_display": None,
+                "font_body": None,
+                "font_url": None,
+                "trial_expires_at": None,
+                "features": {
+                    "show_demo_login": True,
+                    "show_kitchen_board": True,
+                    "show_reports": True,
+                    "allow_member_booking": True,
+                    "allow_preorders": True,
+                    "show_dietary_flags": True,
+                },
+            }
+        return dict(config)
     finally:
         cur.close()
         conn.close()

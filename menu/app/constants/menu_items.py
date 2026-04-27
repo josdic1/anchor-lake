@@ -1,6 +1,6 @@
 """
-Abeyton Lodge — Full Menu Seed
-Based on 2025 Final Menu Rough Draft
+Demo Menu Seed
+Sample menu for onboarding and demonstration purposes.
 Run via: POST /menu/seed
 """
 
