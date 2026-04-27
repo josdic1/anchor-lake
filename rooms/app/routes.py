@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from .database import get_connection
 from .auth import get_current_user, require_role
 from .models import RoomResponse, RoomUpdate, RoomBlockCreate, RoomBlockResponse
+from .constants.rooms import seed_rooms
 from datetime import date
 from typing import Optional
 
@@ -34,10 +35,6 @@ def get_available_rooms(
     meal_type: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    Returns rooms available on the given date, filtered by meal_type.
-    Also returns confirmed_party_size so the frontend can show capacity context.
-    """
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -46,7 +43,6 @@ def get_available_rooms(
         else:
             dines_clause = ""
 
-        # Get available rooms with confirmed party totals
         cur.execute(f"""
             SELECT
                 r.id,
@@ -111,6 +107,31 @@ def get_room(room_id: int, current_user: dict = Depends(get_current_user)):
         conn.close()
 
 
+@router.post("/rooms", response_model=RoomResponse)
+def create_room(body: RoomUpdate, current_user: dict = Depends(require_role("admin"))):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        fields = body.model_dump(exclude_none=True)
+        if not fields:
+            raise HTTPException(status_code=400, detail="No fields provided")
+
+        cols = ", ".join(fields.keys())
+        placeholders = ", ".join("%s" for _ in fields)
+        values = list(fields.values())
+
+        cur.execute(f"""
+            INSERT INTO rooms ({cols})
+            VALUES ({placeholders})
+            RETURNING id, name, capacity, one_booking_max, dines_only, is_active, notes
+        """, values)
+        conn.commit()
+        return cur.fetchone()
+    finally:
+        cur.close()
+        conn.close()
+
+
 @router.patch("/rooms/{room_id}", response_model=RoomResponse)
 def update_room(room_id: int, body: RoomUpdate, current_user: dict = Depends(require_role("admin"))):
     conn = get_connection()
@@ -134,6 +155,28 @@ def update_room(room_id: int, body: RoomUpdate, current_user: dict = Depends(req
         if not room:
             raise HTTPException(status_code=404, detail="Room not found")
         return room
+    finally:
+        cur.close()
+        conn.close()
+
+
+# =============================================================================
+# SEED
+# =============================================================================
+
+@router.post("/rooms/seed")
+def seed_default_rooms(current_user: dict = Depends(require_role("admin"))):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        result = seed_rooms(cur)
+        conn.commit()
+        return {"message": "Rooms seeded successfully", **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Seed failed: {str(e)}")
     finally:
         cur.close()
         conn.close()
