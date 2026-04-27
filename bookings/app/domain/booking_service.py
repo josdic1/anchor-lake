@@ -12,26 +12,23 @@ from .status_service import get_allowed_actions
 
 
 def create_full_booking(cur, user_id: int, role: str, payload) -> dict:
-    """
-    Atomic booking creation. Inserts booking + all attendees in one transaction.
-    Caller is responsible for conn.commit() or conn.rollback().
-
-    Returns: { booking: dict, attendees: list, allowed_actions: list }
-    """
+    # Use on_behalf_of_user_id if provided (admin/staff booking for a member)
+    booking_owner_id = payload.on_behalf_of_user_id if payload.on_behalf_of_user_id else user_id
+ 
     booking_date = payload.booking_date
     meal_type = payload.meal_type
     estimated_arrival = payload.estimated_arrival
     room_id = payload.room_id
-
+ 
     # ── Validation ──────────────────────────────────────────────────────
     if role not in ("admin", "staff"):
         if booking_date < date.today():
             raise HTTPException(status_code=400, detail="Cannot create bookings for past dates")
-
+ 
     if role != "admin":
         check_meal_window(cur, meal_type, estimated_arrival, booking_date)
-
-    # ── Insert booking ──────────────────────────────────────────────────
+ 
+    # ── Insert booking — use booking_owner_id not user_id ───────────────
     cur.execute("""
         INSERT INTO bookings (
             booking_member_id, room_id, booking_date, meal_type,
@@ -40,7 +37,7 @@ def create_full_booking(cur, user_id: int, role: str, payload) -> dict:
         VALUES (%s, %s, %s, %s, %s, %s, %s, 0)
         RETURNING *
     """, (
-        user_id, room_id, booking_date,
+        booking_owner_id, room_id, booking_date,     # <-- booking_owner_id here
         meal_type, estimated_arrival,
         payload.notes, payload.is_special_event
     ))

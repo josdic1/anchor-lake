@@ -109,6 +109,7 @@ class BookingCreateFull(BaseModel):
     notes: Optional[str] = None
     is_special_event: bool = False
     confirm_immediately: bool = False
+    on_behalf_of_user_id: Optional[int] = None
     attendees: AttendeeListInput
 
 
