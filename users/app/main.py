@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from .routes import router
+from .demo import router as demo_router
 
 security = HTTPBearer()
 
@@ -25,8 +26,10 @@ app.add_middleware(
 )
 
 app.include_router(router)
-
+app.include_router(demo_router)
 
 @app.get("/health")
 def health():
     return {"service": "users", "status": "ok"}
+
+
