@@ -243,7 +243,7 @@ def seed_sample_data(cur, hashed_pw, admin_id):
                 status = random.choice(["CONFIRMED", "SEATED", "SERVICE", "CONFIRMED"])
             else:
                 status = "CONFIRMED"
-                
+
             cur.execute("""
                 INSERT INTO bookings (
                     booking_member_id, room_id, booking_date, meal_type,
@@ -360,7 +360,7 @@ def reset_sample():
 
 
 @router.get("/demo/users")
-def get_demo_users(current_user: dict = Depends(require_role("admin"))):
+def get_demo_users():
     """Auth required. Returns all active users for the quick-login panel."""
     conn = get_connection()
     cur = conn.cursor()
