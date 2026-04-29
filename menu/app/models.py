@@ -7,6 +7,7 @@ class MenuCategory(str, Enum):
     STARTER = "STARTER"
     MAIN    = "MAIN"
     SIDE    = "SIDE"
+    KIDS    = "KIDS"
     DESSERT = "DESSERT"
     DRINK   = "DRINK"
     SPECIAL = "SPECIAL"
