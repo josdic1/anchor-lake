@@ -1,0 +1,12 @@
+{
+  "folders": [
+    {
+      "name": "anchor-lake-frontend",
+      "path": "anchor-tenant-frontend",
+    },
+    {
+      "name": "anchor-lake-backend",
+      "path": "anchor-tenant-backend",
+    },
+  ],
+}
