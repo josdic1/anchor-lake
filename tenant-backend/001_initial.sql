@@ -75,8 +75,8 @@ CREATE TABLE tenant_config (
 
 INSERT INTO tenant_config (name, primary_color, logo_url, tagline, features)
 VALUES (
-    'My Club',
-    '#a38a64',
+    'Anchor Lake',
+    '#eb5638',
     '',
     'Member Portal',
     '{"show_demo_login": true, "show_kitchen_board": true, "show_reports": true, "allow_member_booking": true, "allow_preorders": true, "show_dietary_flags": true}'::jsonb
