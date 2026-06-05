@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useTenant } from "../hooks/useTenant";
 import { usersApi } from "../api/client";
 import type { LoginRequest } from "../types/auth";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 type PageMode = "checking" | "setup" | "login";
 type SetupStep =
@@ -20,8 +19,6 @@ type DemoUser = {
   email: string;
   role: "admin" | "staff" | "member";
 };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -54,27 +51,25 @@ function CopyButton({ text }: { text: string }) {
 }
 
 const ROLE_STYLE: Record<string, { bg: string; color: string }> = {
-  admin: { bg: "#fee2e2", color: "#991b1b" },
-  staff: { bg: "#dbeafe", color: "#1e40af" },
-  member: { bg: "#dcfce7", color: "#166534" },
+  admin: { bg: "var(--error-bg)", color: "var(--error)" },
+  staff: { bg: "var(--zinc-100)", color: "var(--zinc-700)" },
+  member: { bg: "var(--accent-light)", color: "var(--accent-hover)" },
 };
-
-// ─── Demo Login Panel ─────────────────────────────────────────────────────────
 
 function DemoLoginPanel({
   onLogin,
   loggingIn,
-  open, // add this
+  open,
 }: {
   onLogin: (email: string) => void;
   loggingIn: string | null;
-  open: boolean; // add this
+  open: boolean;
 }) {
   const [users, setUsers] = useState<DemoUser[]>([]);
-  const [loading, setLoading] = useState(false); // change to false
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!open) return; // add this guard
+    if (!open) return;
     setLoading(true);
     usersApi
       .get("/demo/users")
@@ -82,7 +77,7 @@ function DemoLoginPanel({
       .finally(() => setLoading(false));
   }, [open]);
 
-  const groups: { label: string; role: string }[] = [
+  const groups = [
     { label: "Admin", role: "admin" },
     { label: "Staff", role: "staff" },
     { label: "Members", role: "member" },
@@ -138,7 +133,7 @@ function DemoLoginPanel({
                       alignItems: "center",
                       justifyContent: "space-between",
                       padding: "10px 14px",
-                      border: "1.5px solid var(--zinc-150, #f0ede8)",
+                      border: "1.5px solid var(--zinc-200)",
                       borderRadius: "10px",
                       background: active
                         ? "var(--accent-light)"
@@ -155,7 +150,7 @@ function DemoLoginPanel({
                     }}
                     onMouseLeave={(e) => {
                       (e.currentTarget as HTMLElement).style.borderColor =
-                        "var(--zinc-150, #f0ede8)";
+                        "var(--zinc-200)";
                     }}
                   >
                     <div
@@ -194,7 +189,7 @@ function DemoLoginPanel({
                           {u.first_name} {u.last_name}
                         </div>
                         <div
-                          style={{ fontSize: "11px", color: "var(--zinc-400)" }}
+                          style={{ fontSize: "11px", color: "var(--zinc-500)" }}
                         >
                           {u.email}
                         </div>
@@ -213,7 +208,7 @@ function DemoLoginPanel({
                       />
                     ) : (
                       <span
-                        style={{ fontSize: "14px", color: "var(--zinc-300)" }}
+                        style={{ fontSize: "14px", color: "var(--zinc-400)" }}
                       >
                         →
                       </span>
@@ -229,8 +224,6 @@ function DemoLoginPanel({
     </div>
   );
 }
-
-// ─── Setup Flow ───────────────────────────────────────────────────────────────
 
 function SetupFlow({
   onSetupDone,
@@ -269,7 +262,6 @@ function SetupFlow({
 
   async function handleQuickLogin(email: string) {
     setLoggingIn(email);
-    // This will be handled by parent
     onLogin(email);
   }
 
@@ -319,7 +311,6 @@ function SetupFlow({
             How would you like to get started?
           </div>
         </div>
-
         <button
           onClick={() => setStep("fresh-confirm")}
           style={{
@@ -369,7 +360,6 @@ function SetupFlow({
             members.
           </div>
         </button>
-
         <button
           onClick={() => setStep("sample-confirm")}
           style={{
@@ -448,11 +438,10 @@ function SetupFlow({
             members from Admin.
           </div>
         </div>
-
         <div
           style={{
             background: "var(--zinc-50)",
-            border: "1px solid var(--zinc-150, #f0ede8)",
+            border: "1px solid var(--zinc-200)",
             borderRadius: "10px",
             padding: "16px 18px",
           }}
@@ -498,13 +487,12 @@ function SetupFlow({
             </div>
           </div>
         </div>
-
         {error && (
           <div
             style={{
               fontSize: "13px",
-              color: "#991b1b",
-              background: "#fee2e2",
+              color: "var(--error)",
+              background: "var(--error-bg)",
               padding: "10px 14px",
               borderRadius: "8px",
             }}
@@ -512,7 +500,6 @@ function SetupFlow({
             {error}
           </div>
         )}
-
         <div style={{ display: "flex", gap: "8px" }}>
           <button
             onClick={doFresh}
@@ -522,7 +509,7 @@ function SetupFlow({
               borderRadius: "9px",
               border: "none",
               background: "var(--zinc-900)",
-              color: "white",
+              color: "var(--bg-canvas)",
               fontSize: "14px",
               fontWeight: 600,
               cursor: "pointer",
@@ -573,7 +560,6 @@ function SetupFlow({
             Seeds realistic data so you can explore every part of the platform.
           </div>
         </div>
-
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {[
             { icon: "👥", text: "8 member households with dietary flags" },
@@ -603,13 +589,12 @@ function SetupFlow({
             </div>
           ))}
         </div>
-
         {error && (
           <div
             style={{
               fontSize: "13px",
-              color: "#991b1b",
-              background: "#fee2e2",
+              color: "var(--error)",
+              background: "var(--error-bg)",
               padding: "10px 14px",
               borderRadius: "8px",
             }}
@@ -617,7 +602,6 @@ function SetupFlow({
             {error}
           </div>
         )}
-
         <div style={{ display: "flex", gap: "8px" }}>
           <button
             onClick={doSample}
@@ -627,7 +611,7 @@ function SetupFlow({
               borderRadius: "9px",
               border: "none",
               background: "var(--zinc-900)",
-              color: "white",
+              color: "var(--bg-canvas)",
               fontSize: "14px",
               fontWeight: 600,
               cursor: "pointer",
@@ -678,7 +662,6 @@ function SetupFlow({
             Sample data loaded. Pick an account below to log in instantly.
           </div>
         </div>
-
         <div
           style={{
             display: "flex",
@@ -687,7 +670,7 @@ function SetupFlow({
             padding: "14px 16px",
             background: "var(--zinc-50)",
             borderRadius: "10px",
-            border: "1px solid var(--zinc-150, #f0ede8)",
+            border: "1px solid var(--zinc-200)",
           }}
         >
           <div
@@ -707,7 +690,6 @@ function SetupFlow({
           </div>
           <CopyButton text="admin@demo.com" />
         </div>
-
         <div
           style={{
             display: "flex",
@@ -716,7 +698,7 @@ function SetupFlow({
             padding: "14px 16px",
             background: "var(--zinc-50)",
             borderRadius: "10px",
-            border: "1px solid var(--zinc-150, #f0ede8)",
+            border: "1px solid var(--zinc-200)",
           }}
         >
           <div
@@ -736,7 +718,6 @@ function SetupFlow({
           </div>
           <CopyButton text="james.hartwell@demo.com" />
         </div>
-
         <div style={{ display: "flex", gap: "8px" }}>
           <button
             onClick={onSetupDone}
@@ -746,7 +727,7 @@ function SetupFlow({
               borderRadius: "9px",
               border: "none",
               background: "var(--zinc-900)",
-              color: "white",
+              color: "var(--bg-canvas)",
               fontSize: "14px",
               fontWeight: 600,
               cursor: "pointer",
@@ -755,7 +736,6 @@ function SetupFlow({
             Go to login →
           </button>
         </div>
-
         <DemoLoginPanel
           onLogin={handleQuickLogin}
           loggingIn={loggingIn}
@@ -768,10 +748,9 @@ function SetupFlow({
   return null;
 }
 
-// ─── Main LoginPage ───────────────────────────────────────────────────────────
-
 export function LoginPage() {
   const { loginUser } = useAuth();
+  const { name, logo_url } = useTenant();
   const [pageMode, setPageMode] = useState<PageMode>("checking");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -780,7 +759,6 @@ export function LoginPage() {
   const [showDemoPanel, setShowDemoPanel] = useState(false);
   const [loggingIn, setLoggingIn] = useState<string | null>(null);
 
-  // Check if DB needs setup
   useEffect(() => {
     async function check() {
       try {
@@ -825,7 +803,6 @@ export function LoginPage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "var(--bg-base, #f9f8f6)",
         }}
       >
         <div
@@ -848,13 +825,13 @@ export function LoginPage() {
       style={{
         minHeight: "100vh",
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "center",
-        background: "var(--bg-base, #f9f8f6)",
-        padding: "24px",
+        padding: "18vh 20px 32px",
+        background: "var(--bg-canvas)",
       }}
     >
-      <div style={{ width: "100%", maxWidth: "420px" }}>
+      <div style={{ width: "100%", maxWidth: "460px" }}>
         {pageMode === "setup" ? (
           <SetupFlow
             onSetupDone={() => setPageMode("login")}
@@ -862,15 +839,39 @@ export function LoginPage() {
           />
         ) : (
           <>
-            {/* Normal login form */}
-            <div style={{ marginBottom: "32px", textAlign: "center" }}>
+            <div style={{ marginBottom: "34px", textAlign: "center" }}>
+              {logo_url && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginBottom: "38px",
+                  }}
+                >
+                  <img
+                    src={logo_url}
+                    alt={name}
+                    style={{
+                      display: "block",
+                      width: "min(82vw, 330px)",
+                      height: "auto",
+                      maxWidth: "100%",
+                      maxHeight: "140px",
+                      objectFit: "contain",
+                      color: "var(--zinc-700)",
+                    }}
+                  />
+                </div>
+              )}
               <div
                 style={{
                   fontFamily: "var(--font-display)",
-                  fontSize: "32px",
+                  fontSize: "34px",
                   fontWeight: 500,
                   color: "var(--zinc-900)",
-                  marginBottom: "6px",
+                  marginBottom: "4px",
+                  lineHeight: 1.05,
                 }}
               >
                 Sign in
@@ -879,10 +880,9 @@ export function LoginPage() {
                 Enter your credentials to continue
               </div>
             </div>
-
             <form
               onSubmit={handleLogin}
-              style={{ display: "flex", flexDirection: "column", gap: "14px" }}
+              style={{ display: "flex", flexDirection: "column", gap: "15px" }}
             >
               <div className="form-stack">
                 <label>
@@ -910,13 +910,12 @@ export function LoginPage() {
                   />
                 </label>
               </div>
-
               {error && (
                 <div
                   style={{
                     fontSize: "13px",
-                    color: "#991b1b",
-                    background: "#fee2e2",
+                    color: "var(--error)",
+                    background: "var(--error-bg)",
                     padding: "10px 14px",
                     borderRadius: "8px",
                   }}
@@ -924,22 +923,19 @@ export function LoginPage() {
                   {error}
                 </div>
               )}
-
               <button
                 type="submit"
                 disabled={loading}
                 className="btn-primary"
-                style={{ width: "100%", padding: "12px", fontSize: "14px" }}
+                style={{ width: "100%", padding: "13px", fontSize: "14px" }}
               >
                 {loading ? "Signing in..." : "Sign in"}
               </button>
             </form>
-
-            {/* Demo quick-switch */}
             <div
               style={{
                 marginTop: "24px",
-                borderTop: "1px solid var(--zinc-150, #f0ede8)",
+                borderTop: "1px solid var(--zinc-200)",
                 paddingTop: "20px",
               }}
             >
@@ -967,7 +963,6 @@ export function LoginPage() {
               >
                 {showDemoPanel ? "Hide accounts" : "Quick switch account"}
               </button>
-
               {showDemoPanel && (
                 <div style={{ marginTop: "16px" }}>
                   <DemoLoginPanel
@@ -978,8 +973,6 @@ export function LoginPage() {
                 </div>
               )}
             </div>
-
-            {/* Reset option */}
             <div style={{ marginTop: "20px", textAlign: "center" }}>
               <button
                 onClick={() => setPageMode("setup")}
