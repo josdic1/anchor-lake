@@ -23,9 +23,9 @@ export type TenantConfig = {
 };
 
 export const defaultTenantConfig: TenantConfig = {
-  name: "My Club",
+  name: "Anchor Lake",
   tagline: "Member Portal",
-  primary_color: "#a38a64",
+  primary_color: "#eb5638",
   logo_url: "",
   font_display: "Cormorant Garamond",
   font_body: "Inter",
