@@ -52,4 +52,4 @@ class MenuItemResponse(BaseModel):
     is_modifier: bool
     parent_item_id: Optional[int]
     dietary_flags: list[str]
-    sort_order: int
+    sort_order: int# KIDS category added

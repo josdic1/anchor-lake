@@ -47,6 +47,7 @@ class OrderItemResponse(BaseModel):
     unit_price: float
     special_instructions: Optional[str]
     modifier_ids: list[int]
+    voided: bool = False
 
 
 class KitchenStatusUpdate(BaseModel):

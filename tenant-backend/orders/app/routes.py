@@ -118,7 +118,6 @@ def get_order(order_id: int, current_user: dict = Depends(get_current_user)):
         cur.close()
         conn.close()
 
-
 @router.patch("/orders/{order_id}/fire", response_model=OrderResponse)
 def fire_order(order_id: int, current_user: dict = Depends(require_role("admin", "staff"))):
     conn = get_connection()
@@ -145,11 +144,54 @@ def fire_order(order_id: int, current_user: dict = Depends(require_role("admin",
                     old_value={"kitchen_status": "INCOMING"},
                     new_value={"kitchen_status": "IN_KITCHEN", "fired_at": str(updated["fired_at"])})
         conn.commit()
+
+        # Auto-advance SEATED → SERVICE on first fire
+        cur.execute("SELECT status FROM bookings WHERE id = %s", (updated["booking_id"],))
+        booking_status = cur.fetchone()
+        if booking_status and booking_status["status"] == "SEATED":
+            cur.execute("""
+                UPDATE bookings
+                SET status = 'SERVICE', service_at = NOW(), updated_at = NOW()
+                WHERE id = %s
+            """, (updated["booking_id"],))
+            write_audit(cur, 'booking', updated["booking_id"], 'BOOKING_STATUS_CHANGE',
+                        int(current_user["sub"]),
+                        old_value={"status": "SEATED"},
+                        new_value={"status": "SERVICE"})
+            conn.commit()
+
+        # Print kitchen chit
+        try:
+            cur.execute("""
+                SELECT quantity, menu_item_id, special_instructions
+                FROM order_items
+                WHERE order_id = %s
+            """, (order_id,))
+            items = cur.fetchall()
+
+            cur.execute("SELECT * FROM bookings WHERE id = %s", (updated["booking_id"],))
+            booking = cur.fetchone()
+
+            cur.execute("""
+                SELECT a.dietary_flags, a.dietary_other_note
+                FROM booking_attendees a
+                WHERE a.booking_id = %s
+            """, (updated["booking_id"],))
+            attendees = cur.fetchall()
+
+            cur.execute("SELECT name FROM rooms WHERE id = %s", (booking["room_id"],))
+            room = cur.fetchone()
+            room_name = room["name"] if room else f"Room {booking['room_id']}"
+
+            from .printer import print_kitchen_chit
+            print_kitchen_chit(dict(updated), [dict(i) for i in items], dict(booking), [dict(a) for a in attendees], room_name)
+        except Exception as e:
+            print(f"[printer] Non-fatal print error: {e}")
+
         return updated
     finally:
         cur.close()
         conn.close()
-
 
 @router.patch("/orders/{order_id}/kitchen-status", response_model=OrderResponse)
 def update_kitchen_status(order_id: int, body: KitchenStatusUpdate, current_user: dict = Depends(require_role("admin", "staff"))):
@@ -176,7 +218,21 @@ def update_kitchen_status(order_id: int, body: KitchenStatusUpdate, current_user
         cur.close()
         conn.close()
 
-
+@router.delete("/orders/{order_id}", status_code=204)
+def delete_order(order_id: int, current_user: dict = Depends(require_role("admin", "staff"))):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        order = get_order_or_404(cur, order_id)
+        if order["fired_at"] is not None:
+            raise HTTPException(status_code=400, detail="Cannot delete a fired order")
+        cur.execute("DELETE FROM order_items WHERE order_id = %s", (order_id,))
+        cur.execute("DELETE FROM orders WHERE id = %s", (order_id,))
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+        
 # =============================================================================
 # KITCHEN BOARD — filtered by booking_date = today
 # =============================================================================
@@ -252,10 +308,11 @@ def get_order_items(order_id: int, current_user: dict = Depends(get_current_user
     try:
         get_order_or_404(cur, order_id)
         cur.execute("""
-            SELECT id, order_id, menu_item_id, quantity, unit_price, special_instructions, modifier_ids
-            FROM order_items WHERE order_id = %s
-            ORDER BY id
-        """, (order_id,))
+    SELECT id, order_id, menu_item_id, quantity, unit_price, 
+           special_instructions, modifier_ids, voided
+    FROM order_items WHERE order_id = %s
+    ORDER BY id
+""", (order_id,))
         return cur.fetchall()
     finally:
         cur.close()
@@ -274,7 +331,7 @@ def add_order_item(order_id: int, body: OrderItemCreate, current_user: dict = De
         cur.execute("""
             INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, special_instructions, modifier_ids)
             VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING id, order_id, menu_item_id, quantity, unit_price, special_instructions, modifier_ids
+            RETURNING id, order_id, menu_item_id, quantity, unit_price, special_instructions, modifier_ids, voided
         """, (order_id, body.menu_item_id, body.quantity, body.unit_price, body.special_instructions, body.modifier_ids))
         conn.commit()
         return cur.fetchone()
@@ -324,6 +381,28 @@ def remove_order_item(order_id: int, item_id: int, current_user: dict = Depends(
         if not cur.fetchone():
             raise HTTPException(status_code=404)
         return {"message": "Item removed"}
+    finally:
+        cur.close()
+        conn.close()
+
+@router.patch("/orders/{order_id}/items/{item_id}/void", status_code=200)
+def void_order_item(order_id: int, item_id: int, current_user: dict = Depends(require_role("admin"))):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        get_order_or_404(cur, order_id)
+        cur.execute("""
+            UPDATE order_items SET voided = TRUE
+            WHERE id = %s AND order_id = %s
+            RETURNING id
+        """, (item_id, order_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Order item not found")
+        write_audit(cur, 'order', order_id, 'ORDER_ITEM_VOIDED',
+                    int(current_user["sub"]),
+                    new_value={"item_id": item_id})
+        conn.commit()
+        return {"message": "Item voided"}
     finally:
         cur.close()
         conn.close()

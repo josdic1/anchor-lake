@@ -71,6 +71,7 @@ class AttendeeCreate(BaseModel):
     guest_last_name: Optional[str] = None
     is_member_guest: bool = False
     dietary_flags: list[str] = []
+    dietary_other_note: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -82,6 +83,7 @@ class AttendeeResponse(BaseModel):
     guest_last_name: Optional[str]
     is_member_guest: bool
     dietary_flags: list[str]
+    dietary_other_note: Optional[str]
     notes: Optional[str]
 
 
@@ -93,6 +95,7 @@ class GuestAttendeeInput(BaseModel):
     linked_member_id: Optional[int] = None
     is_member_guest: bool = False
     dietary_flags: list[str] = []
+    dietary_other_note: Optional[str] = None
     notes: Optional[str] = None
 
 

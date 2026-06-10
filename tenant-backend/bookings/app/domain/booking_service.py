@@ -37,7 +37,7 @@ def create_full_booking(cur, user_id: int, role: str, payload) -> dict:
         VALUES (%s, %s, %s, %s, %s, %s, %s, 0)
         RETURNING *
     """, (
-        booking_owner_id, room_id, booking_date,     # <-- booking_owner_id here
+        booking_owner_id, room_id, booking_date,
         meal_type, estimated_arrival,
         payload.notes, payload.is_special_event
     ))
@@ -69,41 +69,45 @@ def create_full_booking(cur, user_id: int, role: str, payload) -> dict:
                     detail=f"Member {member_id} not found"
                 )
 
-        # Get member dietary flags for the attendee record
+        # Get member dietary flags and other note for the attendee record
         cur.execute(
-            "SELECT dietary_flags FROM members WHERE id = %s",
+            "SELECT dietary_flags, dietary_other_note FROM members WHERE id = %s",
             (member_id,)
         )
         member_row = cur.fetchone()
         member_flags = member_row["dietary_flags"] if member_row else []
+        member_other_note = member_row["dietary_other_note"] if member_row else None
 
         cur.execute("""
             INSERT INTO booking_attendees (
                 booking_id, linked_member_id, guest_first_name, guest_last_name,
-                is_member_guest, dietary_flags, notes
+                is_member_guest, dietary_flags, dietary_other_note, notes
             )
-            VALUES (%s, %s, NULL, NULL, FALSE, %s::dietary_flag[], NULL)
+            VALUES (%s, %s, NULL, NULL, FALSE, %s::dietary_flag[], %s, NULL)
             RETURNING id, booking_id, linked_member_id, guest_first_name,
-                      guest_last_name, is_member_guest, dietary_flags, notes
-        """, (booking_id, member_id, member_flags if isinstance(member_flags, list) else []))
+                      guest_last_name, is_member_guest, dietary_flags, dietary_other_note, notes
+        """, (booking_id, member_id, member_flags if isinstance(member_flags, list) else [], member_other_note))
         attendees.append(cur.fetchone())
 
     # ── Insert guest attendees ──────────────────────────────────────────
+        # ── Insert guest attendees ──────────────────────────────────────────
     for guest in payload.attendees.guests:
         cur.execute("""
             INSERT INTO booking_attendees (
                 booking_id, linked_member_id, guest_first_name, guest_last_name,
-                is_member_guest, dietary_flags, notes
+                is_member_guest, dietary_flags, dietary_other_note, notes
             )
-            VALUES (%s, %s, %s, %s, %s, %s::dietary_flag[], %s)
+            VALUES (%s, %s, %s, %s, %s, %s::dietary_flag[], %s, %s)
             RETURNING id, booking_id, linked_member_id, guest_first_name,
-                      guest_last_name, is_member_guest, dietary_flags, notes
+                      guest_last_name, is_member_guest, dietary_flags, dietary_other_note, notes
         """, (
             booking_id,
             guest.linked_member_id if hasattr(guest, 'linked_member_id') else None,
-            guest.first_name, guest.last_name,
+            guest.first_name,
+            guest.last_name,
             guest.is_member_guest if hasattr(guest, 'is_member_guest') else False,
             guest.dietary_flags if hasattr(guest, 'dietary_flags') else [],
+            guest.dietary_other_note if hasattr(guest, 'dietary_other_note') else None,
             guest.notes if hasattr(guest, 'notes') else None,
         ))
         attendees.append(cur.fetchone())

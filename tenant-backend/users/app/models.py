@@ -27,6 +27,7 @@ class UserCreate(BaseModel):
     password: str
     role: UserRole = UserRole.member
     member_number: Optional[str] = None
+    sub_role: Optional[str] = None
     notes: Optional[str] = None
 
     @field_validator("email")
@@ -42,6 +43,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     role: Optional[UserRole] = None
     member_number: Optional[str] = None
+    sub_role: Optional[str] = None
     is_active: Optional[bool] = None
     force_password_change: Optional[bool] = None
     notes: Optional[str] = None
@@ -61,6 +63,7 @@ class UserResponse(BaseModel):
     email: str
     role: UserRole
     member_number: Optional[str]
+    sub_role: Optional[str] = None
     is_active: bool
     force_password_change: bool
     notes: Optional[str]
@@ -81,6 +84,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user_id: int
     role: str
+    sub_role: Optional[str] = None
     force_password_change: bool = False
 
 
@@ -93,6 +97,7 @@ class MemberCreate(BaseModel):
     last_name: str
     relation: MemberRelation = MemberRelation.PRIMARY
     dietary_flags: List[str] = []
+    dietary_other_note: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -101,6 +106,7 @@ class MemberUpdate(BaseModel):
     last_name: Optional[str] = None
     relation: Optional[MemberRelation] = None
     dietary_flags: Optional[List[str]] = None
+    dietary_other_note: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -111,5 +117,6 @@ class MemberResponse(BaseModel):
     last_name: str
     relation: MemberRelation
     dietary_flags: List[str]
+    dietary_other_note: Optional[str]
     notes: Optional[str]
     is_active: bool

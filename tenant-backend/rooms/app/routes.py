@@ -39,7 +39,7 @@ def get_available_rooms(
     cur = conn.cursor()
     try:
         if meal_type == "AFTERHOURS":
-            dines_clause = "AND r.dines_only = FALSE"
+            dines_clause = ""
         else:
             dines_clause = ""
 

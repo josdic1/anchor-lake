@@ -14,6 +14,7 @@ oauth2_scheme = HTTPBearer()
 
 
 def hash_password(password: str) -> str:
+    
     return pwd_context.hash(password)
 
 

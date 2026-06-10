@@ -57,6 +57,8 @@ def get_public_config():
     finally:
         cur.close()
         conn.close()
+
+
 # =============================================================================
 # HELPERS
 # =============================================================================
@@ -94,7 +96,7 @@ def login(body: LoginRequest):
         email = normalize_email(body.email)
         cur.execute(
             """
-            SELECT id, hashed_password, role, is_active, force_password_change
+            SELECT id, hashed_password, role, sub_role, is_active, force_password_change
             FROM users
             WHERE LOWER(email) = %s
             """,
@@ -112,6 +114,7 @@ def login(body: LoginRequest):
         token = create_access_token({
             "sub": str(user["id"]),
             "role": user["role"],
+            "sub_role": user["sub_role"],
         })
 
         return {
@@ -119,6 +122,7 @@ def login(body: LoginRequest):
             "token_type": "bearer",
             "user_id": user["id"],
             "role": user["role"],
+            "sub_role": user["sub_role"],
             "force_password_change": user["force_password_change"],
         }
     finally:
@@ -138,7 +142,7 @@ def get_me(current_user: dict = Depends(get_current_user)):
         cur.execute(
             """
             SELECT id, first_name, last_name, email, role, member_number,
-                   is_active, force_password_change, notes
+                   sub_role, is_active, force_password_change, notes
             FROM users
             WHERE id = %s
             """,
@@ -151,6 +155,7 @@ def get_me(current_user: dict = Depends(get_current_user)):
     finally:
         cur.close()
         conn.close()
+
 
 class ChangeMyPasswordRequest(BaseModel):
     current_password: str
@@ -168,11 +173,7 @@ def change_my_password(
         user_id = int(current_user["sub"])
 
         cur.execute(
-            """
-            SELECT id, hashed_password
-            FROM users
-            WHERE id = %s
-            """,
+            "SELECT id, hashed_password FROM users WHERE id = %s",
             (user_id,),
         )
         user = cur.fetchone()
@@ -181,17 +182,12 @@ def change_my_password(
             raise HTTPException(status_code=404, detail="User not found")
 
         if not verify_password(body.current_password, user["hashed_password"]):
-            raise HTTPException(
-                status_code=400,
-                detail="Current password is incorrect",
-            )
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
 
         cur.execute(
             """
             UPDATE users
-            SET hashed_password = %s,
-                force_password_change = FALSE,
-                updated_at = NOW()
+            SET hashed_password = %s, force_password_change = FALSE, updated_at = NOW()
             WHERE id = %s
             RETURNING id
             """,
@@ -203,6 +199,7 @@ def change_my_password(
     finally:
         cur.close()
         conn.close()
+
 
 # =============================================================================
 # USERS — CRUD
@@ -223,18 +220,12 @@ def create_user(body: UserCreate, current_user: dict = Depends(require_role("adm
         cur.execute(
             """
             INSERT INTO users (
-                first_name,
-                last_name,
-                email,
-                hashed_password,
-                role,
-                member_number,
-                notes,
-                force_password_change
+                first_name, last_name, email, hashed_password,
+                role, member_number, sub_role, notes, force_password_change
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)
             RETURNING id, first_name, last_name, email, role, member_number,
-                      is_active, force_password_change, notes
+                      sub_role, is_active, force_password_change, notes
             """,
             (
                 body.first_name,
@@ -243,6 +234,7 @@ def create_user(body: UserCreate, current_user: dict = Depends(require_role("adm
                 hashed,
                 body.role,
                 body.member_number,
+                body.sub_role,
                 body.notes,
             ),
         )
@@ -261,7 +253,7 @@ def get_users(current_user: dict = Depends(require_role("admin", "staff"))):
         cur.execute(
             """
             SELECT id, first_name, last_name, email, role, member_number,
-                   is_active, force_password_change, notes
+                   sub_role, is_active, force_password_change, notes
             FROM users
             ORDER BY last_name, first_name
             """
@@ -280,7 +272,7 @@ def get_user(user_id: int, current_user: dict = Depends(get_current_user)):
         cur.execute(
             """
             SELECT id, first_name, last_name, email, role, member_number,
-                   is_active, force_password_change, notes
+                   sub_role, is_active, force_password_change, notes
             FROM users
             WHERE id = %s
             """,
@@ -300,11 +292,7 @@ def get_dietary_options(current_user: dict = Depends(get_current_user)):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute(
-            """
-            SELECT unnest(enum_range(NULL::dietary_flag))::text AS flag
-            """
-        )
+        cur.execute("SELECT unnest(enum_range(NULL::dietary_flag))::text AS flag")
         rows = cur.fetchall()
         return [row["flag"] for row in rows]
     finally:
@@ -328,13 +316,8 @@ def update_user(
 
         if "email" in update_data and update_data["email"] is not None:
             update_data["email"] = normalize_email(update_data["email"])
-
             cur.execute(
-                """
-                SELECT id
-                FROM users
-                WHERE LOWER(email) = %s AND id != %s
-                """,
+                "SELECT id FROM users WHERE LOWER(email) = %s AND id != %s",
                 (update_data["email"], user_id),
             )
             if cur.fetchone():
@@ -354,7 +337,7 @@ def update_user(
             SET {set_clause}, updated_at = NOW()
             WHERE id = %s
             RETURNING id, first_name, last_name, email, role, member_number,
-                      is_active, force_password_change, notes
+                      sub_role, is_active, force_password_change, notes
             """,
             values,
         )
@@ -363,7 +346,6 @@ def update_user(
         user = cur.fetchone()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-
         return user
     finally:
         cur.close()
@@ -376,12 +358,7 @@ def deactivate_user(user_id: int, current_user: dict = Depends(require_role("adm
     cur = conn.cursor()
     try:
         cur.execute(
-            """
-            UPDATE users
-            SET is_active = FALSE, updated_at = NOW()
-            WHERE id = %s
-            RETURNING id
-            """,
+            "UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE id = %s RETURNING id",
             (user_id,),
         )
         conn.commit()
@@ -405,7 +382,7 @@ def get_all_members(current_user: dict = Depends(get_current_user)):
         cur.execute(
             """
             SELECT m.id, m.user_id, m.first_name, m.last_name, m.relation,
-                   m.dietary_flags, m.notes, m.is_active
+                   m.dietary_flags, m.dietary_other_note, m.notes, m.is_active
             FROM members m
             JOIN users u ON u.id = m.user_id
             WHERE m.is_active = TRUE AND u.is_active = TRUE
@@ -429,7 +406,7 @@ def get_members(user_id: int, current_user: dict = Depends(get_current_user)):
         cur.execute(
             """
             SELECT id, user_id, first_name, last_name, relation,
-                   dietary_flags, notes, is_active
+                   dietary_flags, dietary_other_note, notes, is_active
             FROM members
             WHERE user_id = %s AND is_active = TRUE
             ORDER BY relation, last_name, first_name
@@ -456,10 +433,10 @@ def create_member(user_id: int, body: MemberCreate, current_user: dict = Depends
 
         cur.execute(
             """
-            INSERT INTO members (user_id, first_name, last_name, relation, dietary_flags, notes)
-            VALUES (%s, %s, %s, %s, %s::dietary_flag[], %s)
+            INSERT INTO members (user_id, first_name, last_name, relation, dietary_flags, dietary_other_note, notes)
+            VALUES (%s, %s, %s, %s, %s::dietary_flag[], %s, %s)
             RETURNING id, user_id, first_name, last_name, relation,
-                      dietary_flags, notes, is_active
+                      dietary_flags, dietary_other_note, notes, is_active
             """,
             (
                 user_id,
@@ -467,6 +444,7 @@ def create_member(user_id: int, body: MemberCreate, current_user: dict = Depends
                 body.last_name,
                 body.relation,
                 body.dietary_flags,
+                body.dietary_other_note,
                 body.notes,
             ),
         )
@@ -510,7 +488,7 @@ def update_member(
             SET {set_clause}, updated_at = NOW()
             WHERE id = %s AND user_id = %s
             RETURNING id, user_id, first_name, last_name, relation,
-                      dietary_flags, notes, is_active
+                      dietary_flags, dietary_other_note, notes, is_active
             """,
             values,
         )
@@ -568,12 +546,7 @@ def seed_admin(body: UserCreate):
         cur.execute(
             """
             INSERT INTO users (
-                first_name,
-                last_name,
-                email,
-                hashed_password,
-                role,
-                force_password_change
+                first_name, last_name, email, hashed_password, role, force_password_change
             )
             VALUES (%s, %s, %s, %s, 'admin', FALSE)
             RETURNING id, first_name, last_name, email, role, member_number,

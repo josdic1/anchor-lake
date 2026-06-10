@@ -21,7 +21,7 @@ from .database import get_connection
 from .auth import get_current_user, require_role
 from .models import (
     BookingCreate, BookingUpdate, BookingResponse,
-    BookingStatusUpdate, AttendeeCreate, AttendeeResponse, 
+    BookingStatusUpdate, AttendeeCreate, AttendeeResponse,
     BookingCreateFull, BookingCommandResponse, AllowedAction
 )
 from datetime import date
@@ -49,6 +49,17 @@ def ensure_booking_access(booking: dict, current_user: dict):
         raise HTTPException(status_code=403, detail="Access denied")
 
 
+def parse_pg_array(value) -> list:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    stripped = value.strip("{}")
+    if not stripped:
+        return []
+    return [item.strip() for item in stripped.split(",")]
+
+
 # =============================================================================
 # BOOKINGS — CRUD
 # =============================================================================
@@ -61,7 +72,6 @@ def create_booking(body: BookingCreate, current_user: dict = Depends(get_current
         user_id = int(current_user["sub"])
         booking_member_id = user_id
 
-        # Block past-date bookings for non-admin
         if current_user["role"] not in ("admin", "staff"):
             if body.booking_date < date.today():
                 raise HTTPException(status_code=400, detail="Cannot create bookings for past dates")
@@ -106,18 +116,30 @@ def get_bookings(current_user: dict = Depends(require_role("admin", "staff"))):
         conn.close()
 
 
-@router.get("/bookings/calendar", response_model=list[BookingResponse])
+@router.get("/bookings/calendar")
 def get_calendar(start: date, end: date, current_user: dict = Depends(get_current_user)):
     conn = get_connection()
     cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT * FROM bookings
-            WHERE booking_date BETWEEN %s AND %s
-            AND status IN ('CONFIRMED', 'SEATED', 'SERVICE', 'COMPLETED')
-            ORDER BY booking_date, estimated_arrival
+            SELECT b.*,
+                   a.guest_first_name AS primary_first_name,
+                   a.guest_last_name  AS primary_last_name
+            FROM bookings b
+            LEFT JOIN LATERAL (
+                SELECT COALESCE(ba.guest_first_name, m.first_name) AS guest_first_name,
+                       COALESCE(ba.guest_last_name,  m.last_name)  AS guest_last_name
+                FROM booking_attendees ba
+                LEFT JOIN members m ON m.id = ba.linked_member_id
+                WHERE ba.booking_id = b.id
+                ORDER BY ba.id
+                LIMIT 1
+            ) a ON true
+            WHERE b.booking_date BETWEEN %s AND %s
+            AND b.status IN ('CONFIRMED', 'SEATED', 'SERVICE', 'COMPLETED')
+            ORDER BY b.booking_date, b.estimated_arrival
         """, (start, end))
-        return cur.fetchall()
+        return [dict(row) for row in cur.fetchall()]
     finally:
         cur.close()
         conn.close()
@@ -301,6 +323,7 @@ def update_meal_window(meal_type: str, body: dict, current_user: dict = Depends(
         cur.close()
         conn.close()
 
+
 # =============================================================================
 # ATTENDEES
 # =============================================================================
@@ -317,13 +340,17 @@ def get_attendees(booking_id: int, current_user: dict = Depends(get_current_user
             SELECT a.id, a.booking_id, a.linked_member_id,
                    COALESCE(a.guest_first_name, m.first_name) AS guest_first_name,
                    COALESCE(a.guest_last_name, m.last_name) AS guest_last_name,
-                   a.is_member_guest, a.dietary_flags, a.notes
+                   a.is_member_guest, a.dietary_flags, a.dietary_other_note, a.notes
             FROM booking_attendees a
             LEFT JOIN members m ON m.id = a.linked_member_id
             WHERE a.booking_id = %s
             ORDER BY a.id
         """, (booking_id,))
-        return cur.fetchall()
+        rows = cur.fetchall()
+        return [
+            {**dict(r), "dietary_flags": parse_pg_array(r["dietary_flags"])}
+            for r in rows
+        ]
     finally:
         cur.close()
         conn.close()
@@ -353,18 +380,34 @@ def add_attendee(booking_id: int, body: AttendeeCreate, current_user: dict = Dep
                 booking["meal_type"], exclude_booking_id=booking_id
             )
 
+        # If adding a linked member with no dietary flags, pull from members table
+        dietary_flags = body.dietary_flags
+        if body.linked_member_id and not dietary_flags:
+            cur.execute(
+                "SELECT dietary_flags FROM members WHERE id = %s",
+                (body.linked_member_id,)
+            )
+            member = cur.fetchone()
+            if member:
+                dietary_flags = parse_pg_array(member["dietary_flags"])
+
         cur.execute("""
             INSERT INTO booking_attendees (
                 booking_id, linked_member_id, guest_first_name, guest_last_name,
-                is_member_guest, dietary_flags, notes
+                is_member_guest, dietary_flags, dietary_other_note, notes
             )
-            VALUES (%s, %s, %s, %s, %s, %s::dietary_flag[], %s)
+            VALUES (%s, %s, %s, %s, %s, %s::dietary_flag[], %s, %s)
             RETURNING id, booking_id, linked_member_id, guest_first_name,
-                      guest_last_name, is_member_guest, dietary_flags, notes
+                      guest_last_name, is_member_guest, dietary_flags, dietary_other_note, notes
         """, (
-            booking_id, body.linked_member_id, body.guest_first_name,
-            body.guest_last_name, body.is_member_guest,
-            body.dietary_flags, body.notes
+            booking_id,
+            body.linked_member_id,
+            body.guest_first_name,
+            body.guest_last_name,
+            body.is_member_guest,
+            dietary_flags,
+            body.dietary_other_note,
+            body.notes
         ))
         conn.commit()
         attendee = cur.fetchone()
@@ -375,7 +418,7 @@ def add_attendee(booking_id: int, body: AttendeeCreate, current_user: dict = Dep
                     new_value={"attendee_id": attendee["id"]})
         conn.commit()
 
-        return attendee
+        return {**dict(attendee), "dietary_flags": parse_pg_array(attendee["dietary_flags"])}
     finally:
         cur.close()
         conn.close()
@@ -453,7 +496,6 @@ def execute_booking_action(booking_id: int, action: str, current_user: dict = De
         booking = get_booking_or_404(cur, booking_id)
         ensure_booking_access(booking, current_user)
 
-        # Map action name to status
         action_to_status = {
             "confirm": "CONFIRMED",
             "revert-to-draft": "DRAFT",
@@ -506,7 +548,7 @@ def get_booking_full(booking_id: int, current_user: dict = Depends(get_current_u
             SELECT a.id, a.booking_id, a.linked_member_id,
                    COALESCE(a.guest_first_name, m.first_name) AS guest_first_name,
                    COALESCE(a.guest_last_name, m.last_name) AS guest_last_name,
-                   a.is_member_guest, a.dietary_flags, a.notes
+                   a.is_member_guest, a.dietary_flags, a.dietary_other_note, a.notes
             FROM booking_attendees a
             LEFT JOIN members m ON m.id = a.linked_member_id
             WHERE a.booking_id = %s
