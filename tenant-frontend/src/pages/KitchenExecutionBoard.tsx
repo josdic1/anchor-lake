@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../hooks/useAuth";
 import {
   getKitchenIncoming,
   getKitchenInKitchen,
@@ -20,6 +21,8 @@ interface KitchenColumnProps {
   actionLabel?: string;
   onAction?: (id: number) => void;
   highlight?: string;
+  isAdmin?: boolean;
+  onRefresh?: () => void;
 }
 
 export function KitchenExecutionBoard() {
@@ -28,6 +31,9 @@ export function KitchenExecutionBoard() {
   const [ready, setReady] = useState<Order[]>([]);
   const [menuMap, setMenuMap] = useState<Record<number, string>>({});
   const [roomMap, setRoomMap] = useState<Record<number, string>>({});
+  const { user } = useAuth();
+  const isKitchenOnly = user?.sub_role === "kitchen";
+  const isAdmin = user?.role === "admin";
 
   const loadOrders = async () => {
     try {
@@ -97,10 +103,11 @@ export function KitchenExecutionBoard() {
           orders={incoming}
           menuMap={menuMap}
           roomMap={roomMap}
-          actionLabel="FIRE TO KITCHEN"
-          onAction={handleFire}
+          actionLabel={isKitchenOnly ? undefined : "FIRE TO KITCHEN"}
+          onAction={isKitchenOnly ? undefined : handleFire}
+          isAdmin={isAdmin}
+          onRefresh={loadOrders}
         />
-
         <KitchenColumn
           title="IN KITCHEN"
           orders={inKitchen}
@@ -109,8 +116,9 @@ export function KitchenExecutionBoard() {
           actionLabel="MARK READY"
           onAction={(id) => handleStatusUpdate(id, "READY")}
           highlight="var(--accent)"
+          isAdmin={isAdmin}
+          onRefresh={loadOrders}
         />
-
         <KitchenColumn
           title="READY"
           orders={ready}
@@ -119,6 +127,8 @@ export function KitchenExecutionBoard() {
           actionLabel="MARK SERVED"
           onAction={(id) => handleStatusUpdate(id, "SERVED")}
           highlight="var(--success)"
+          isAdmin={isAdmin}
+          onRefresh={loadOrders}
         />
       </div>
     </div>
@@ -133,6 +143,8 @@ function KitchenColumn({
   actionLabel,
   onAction,
   highlight,
+  isAdmin = false,
+  onRefresh,
 }: KitchenColumnProps) {
   return (
     <section className="service-column">
@@ -152,7 +164,6 @@ function KitchenColumn({
           ({orders.length})
         </span>
       </h3>
-
       <div className="column-content">
         {orders.map((order) => (
           <KitchenCard
@@ -162,9 +173,10 @@ function KitchenColumn({
             roomMap={roomMap}
             nextLabel={actionLabel}
             onNext={onAction ? () => onAction(order.id) : undefined}
+            isAdmin={isAdmin}
+            onAction={onRefresh}
           />
         ))}
-
         {orders.length === 0 && (
           <div
             style={{

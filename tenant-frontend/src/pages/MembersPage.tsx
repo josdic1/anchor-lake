@@ -33,6 +33,7 @@ export function MembersPage() {
     last_name: "",
     relation: "OTHER" as MemberRelation,
     dietary_flags: [] as string[],
+    dietary_other_note: "",
   });
 
   const [editForm, setEditForm] = useState<Partial<HouseholdMember>>({});
@@ -64,6 +65,9 @@ export function MembersPage() {
     try {
       const created = await createMember(user.userId, {
         ...newMember,
+        dietary_other_note: newMember.dietary_flags.includes("OTHER")
+          ? newMember.dietary_other_note
+          : null,
         notes: null,
       });
       setMembers([...members, created]);
@@ -73,6 +77,7 @@ export function MembersPage() {
         last_name: "",
         relation: "OTHER",
         dietary_flags: [],
+        dietary_other_note: "",
       });
     } catch {
       setError("Failed to add member.");
@@ -83,7 +88,12 @@ export function MembersPage() {
     e.preventDefault();
     if (!user?.userId || !editingId) return;
     try {
-      const updated = await updateMember(user.userId, editingId, editForm);
+      const updated = await updateMember(user.userId, editingId, {
+        ...editForm,
+        dietary_other_note: (editForm.dietary_flags || []).includes("OTHER")
+          ? (editForm.dietary_other_note ?? null)
+          : null,
+      });
       setMembers(members.map((m) => (m.id === editingId ? updated : m)));
       setEditingId(null);
     } catch {
@@ -104,7 +114,10 @@ export function MembersPage() {
 
   const startEditing = (member: HouseholdMember) => {
     setEditingId(member.id);
-    setEditForm(member);
+    setEditForm({
+      ...member,
+      dietary_other_note: member.dietary_other_note ?? "",
+    });
     setShowAddForm(false);
   };
 
@@ -229,13 +242,29 @@ export function MembersPage() {
                     <input
                       type="checkbox"
                       checked={newMember.dietary_flags.includes(opt)}
-                      onChange={() => toggleDietary(opt, false)}
+                      onChange={(e) => e.stopPropagation()}
                     />
                     {opt.replace(/_/g, " ")}
                   </div>
                 ))}
               </div>
             </div>
+            {newMember.dietary_flags.includes("OTHER") && (
+              <label>
+                <span>Please describe your dietary restriction</span>
+                <input
+                  type="text"
+                  placeholder="e.g. lactose intolerant, low sodium..."
+                  value={newMember.dietary_other_note}
+                  onChange={(e) =>
+                    setNewMember({
+                      ...newMember,
+                      dietary_other_note: e.target.value,
+                    })
+                  }
+                />
+              </label>
+            )}
             <button type="submit" className="btn-primary">
               Save Member
             </button>
@@ -301,6 +330,22 @@ export function MembersPage() {
                     </div>
                   ))}
                 </div>
+                {(editForm.dietary_flags || []).includes("OTHER") && (
+                  <label>
+                    <span>Please describe your dietary restriction</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. lactose intolerant, low sodium..."
+                      value={editForm.dietary_other_note ?? ""}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          dietary_other_note: e.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                )}
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                   <button type="submit" className="btn-primary">
                     <Check size={14} /> Update
@@ -351,6 +396,9 @@ export function MembersPage() {
                 {member.dietary_flags.length > 0 && (
                   <div className="member-card__dietary">
                     {member.dietary_flags.join(", ").replace(/_/g, " ")}
+                    {member.dietary_other_note && (
+                      <span> — {member.dietary_other_note}</span>
+                    )}
                   </div>
                 )}
               </div>

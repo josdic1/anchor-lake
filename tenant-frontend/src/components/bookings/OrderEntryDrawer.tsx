@@ -1,11 +1,19 @@
-import { useEffect, useState } from "react";
-import { X, Send, Plus, Minus, Check, ChevronRight } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { X, Send, Plus, Check, ChevronRight, Loader2 } from "lucide-react";
 import {
   getActiveMenuItems,
   type MenuItem,
   type MenuCategory,
 } from "../../api/menu";
-import { createOrder, addOrderItem, fireOrder } from "../../api/orders";
+import {
+  createOrder,
+  addOrderItem,
+  removeOrderItem,
+  fireOrder,
+  cancelOrder,
+  getOrdersByBooking,
+  getOrderItems,
+} from "../../api/orders";
 import { useRole } from "../../hooks/useRole";
 
 type Props = {
@@ -20,26 +28,32 @@ type Props = {
 
 interface CartItem {
   id: string;
+  savedItemId: number | null;
   menuItem: MenuItem;
   quantity: number;
   selectedModifiers: MenuItem[];
   specialInstructions: string;
+  saving: boolean;
+  saveError: boolean;
 }
 
 const ALL_CATEGORIES: MenuCategory[] = [
   "STARTER",
   "MAIN",
   "SIDE",
+  "KIDS",
   "DESSERT",
   "DRINK",
   "SPECIAL",
 ];
+
 const PREORDER_CATEGORIES: MenuCategory[] = ["STARTER", "DRINK"];
 
 const CATEGORY_LABELS: Record<string, string> = {
   STARTER: "Snacks",
   MAIN: "Mains",
   SIDE: "Sides",
+  KIDS: "Kids",
   DESSERT: "Desserts",
   DRINK: "Drinks",
   SPECIAL: "Specials",
@@ -54,6 +68,22 @@ const DIETARY_COLORS: Record<string, string> = {
   SHELLFISH_ALLERGY: "#b45309",
   FISH_ALLERGY: "#b45309",
 };
+
+const MODIFIER_GROUPS: {
+  label: string | null;
+  min: number;
+  max: number;
+  single?: boolean;
+}[] = [
+  { label: "Greens", min: 1, max: 9, single: true },
+  { label: "Protein", min: 10, max: 19, single: true },
+  { label: "Grains", min: 20, max: 29, single: false },
+  { label: "Dressings", min: 30, max: 39, single: false },
+  { label: "Vegetables", min: 40, max: 49, single: false },
+  { label: "Fruits", min: 50, max: 59, single: false },
+  { label: "Cheese", min: 60, max: 69, single: false },
+  { label: null, min: 70, max: 999, single: false },
+];
 
 function dietaryBadge(flag: string) {
   const color = DIETARY_COLORS[flag] ?? "#666";
@@ -91,13 +121,6 @@ function dietaryBadge(flag: string) {
   );
 }
 
-function cartItemId(item: MenuItem, mods: MenuItem[]) {
-  return `${item.id}-${mods
-    .map((m) => m.id)
-    .sort()
-    .join("-")}`;
-}
-
 export function OrderEntryDrawer({
   bookingId,
   bookingStatus,
@@ -115,8 +138,13 @@ export function OrderEntryDrawer({
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [firing, setFiring] = useState(false);
+  const [fireError, setFireError] = useState("");
+
+  const orderIdRef = useRef<number | null>(null);
+  const creatingOrderRef = useRef(false);
+  const cartLengthRef = useRef(0);
+  const newOrderCreatedRef = useRef(false);
 
   const isLiveService = ["SEATED", "SERVICE"].includes(bookingStatus);
   const isPreorder = ["DRAFT", "CONFIRMED"].includes(bookingStatus);
@@ -124,109 +152,218 @@ export function OrderEntryDrawer({
     isStaffOrAdmin || isLiveService ? ALL_CATEGORIES : PREORDER_CATEGORIES;
 
   useEffect(() => {
-    getActiveMenuItems().then((data) => {
-      setMenu(data);
+    async function init() {
+      const [menuData, existingOrders] = await Promise.all([
+        getActiveMenuItems(),
+        getOrdersByBooking(bookingId),
+      ]);
+      setMenu(menuData);
+
+      // Find an existing unfired order and restore it
+      const openOrder =
+        existingOrders.find(
+          (o) => o.fired_at === null && o.kitchen_status === "INCOMING",
+        ) ?? existingOrders[0];
+      if (openOrder) {
+        orderIdRef.current = openOrder.id;
+        const existingItems = await getOrderItems(openOrder.id);
+        const menuItems = menuData;
+        setCart(
+          existingItems.map((item) => ({
+            id: `${item.id}-restored`,
+            savedItemId: item.id,
+            menuItem: menuItems.find((m) => m.id === item.menu_item_id) ?? {
+              id: item.menu_item_id,
+              name: `Item #${item.menu_item_id}`,
+              price: item.unit_price,
+              category: "MAIN" as MenuCategory,
+              description: null,
+              is_active: true,
+              is_modifier: false,
+              is_starter: false,
+              is_special: false,
+              parent_item_id: null,
+              dietary_flags: [],
+              sort_order: 0,
+            },
+            quantity: item.quantity,
+            selectedModifiers: [],
+            specialInstructions: item.special_instructions ?? "",
+            saving: false,
+            saveError: false,
+          })),
+        );
+      }
+
       setLoading(false);
-    });
+    }
+    init();
+  }, [bookingId]);
+
+  useEffect(() => {
+    cartLengthRef.current = cart.filter(
+      (ci) => ci.savedItemId !== null || ci.saving,
+    ).length;
+  }, [cart]);
+
+  useEffect(() => {
+    return () => {
+      const orderId = orderIdRef.current;
+      if (
+        orderId !== null &&
+        newOrderCreatedRef.current &&
+        cartLengthRef.current === 0
+      ) {
+        cancelOrder(orderId).catch(() => {});
+      }
+    };
   }, []);
 
-  const visibleItems = menu.filter(
-    (i) => i.category === activeCategory && !i.is_modifier && i.is_active,
-  );
-  const availableMods = selectedItem
-    ? menu.filter((m) => m.parent_item_id === selectedItem.id && m.is_active)
-    : [];
-
-  // Get total qty in cart for a given menu item (any mods combo)
-  function itemCartQty(itemId: number): number {
-    return cart
-      .filter((ci) => ci.menuItem.id === itemId)
-      .reduce((acc, ci) => acc + ci.quantity, 0);
+  async function ensureOrder(): Promise<number | null> {
+    if (orderIdRef.current !== null) return orderIdRef.current;
+    if (creatingOrderRef.current) {
+      while (creatingOrderRef.current) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return orderIdRef.current;
+    }
+    creatingOrderRef.current = true;
+    try {
+      const order = await createOrder({ booking_id: bookingId });
+      orderIdRef.current = order.id;
+      newOrderCreatedRef.current = true;
+      return order.id;
+    } catch {
+      setFireError("Failed to initialize order. Please try again.");
+      return null;
+    } finally {
+      creatingOrderRef.current = false;
+    }
   }
 
-  function handleCardClick(item: MenuItem) {
-    const hasMods = menu.some(
-      (m) => m.parent_item_id === item.id && m.is_active,
-    );
+  async function handleAddItem(
+    item: MenuItem,
+    mods: MenuItem[],
+    instructions: string,
+  ) {
+    const localId = `${item.id}-${Date.now()}`;
+    setCart((prev) => [
+      ...prev,
+      {
+        id: localId,
+        menuItem: item,
+        quantity: 1,
+        selectedModifiers: mods,
+        specialInstructions: instructions,
+        savedItemId: null,
+        saving: true,
+        saveError: false,
+      },
+    ]);
 
-    if (hasMods) {
-      // Toggle customizer open/close
-      if (selectedItem?.id === item.id) {
-        setSelectedItem(null);
-      } else {
-        setSelectedItem(item);
-        setSelectedMods([]);
-        setSpecialInstructions("");
-      }
+    const orderId = await ensureOrder();
+    if (!orderId) {
+      setCart((prev) => prev.filter((ci) => ci.id !== localId));
       return;
     }
 
-    // No mods — directly toggle in cart
-    const id = cartItemId(item, []);
-    const existing = cart.find((ci) => ci.id === id);
-    if (existing) {
-      // Already in cart — increment
+    try {
+      const saved = await addOrderItem(orderId, {
+        menu_item_id: item.id,
+        quantity: 1,
+        unit_price: item.price,
+        modifier_ids: mods.map((m) => m.id),
+        special_instructions: instructions || null,
+      });
       setCart((prev) =>
         prev.map((ci) =>
-          ci.id === id ? { ...ci, quantity: ci.quantity + 1 } : ci,
+          ci.id === localId
+            ? { ...ci, saving: false, savedItemId: saved.id }
+            : ci,
         ),
       );
-    } else {
-      setCart((prev) => [
-        ...prev,
-        {
-          id,
-          menuItem: item,
-          quantity: 1,
-          selectedModifiers: [],
-          specialInstructions: "",
-        },
-      ]);
+      onOrderUpdated();
+    } catch {
+      setCart((prev) =>
+        prev.map((ci) =>
+          ci.id === localId ? { ...ci, saving: false, saveError: true } : ci,
+        ),
+      );
     }
   }
 
-  function toggleMod(mod: MenuItem) {
-    setSelectedMods((prev) =>
-      prev.find((m) => m.id === mod.id)
-        ? prev.filter((m) => m.id !== mod.id)
-        : [...prev, mod],
-    );
+  async function handleRemoveItem(cartId: string) {
+    const ci = cart.find((c) => c.id === cartId);
+    if (!ci) return;
+    setCart((prev) => prev.filter((c) => c.id !== cartId));
+    if (ci.savedItemId && orderIdRef.current) {
+      try {
+        await removeOrderItem(orderIdRef.current, ci.savedItemId);
+        onOrderUpdated();
+      } catch {
+        setCart((prev) => [...prev, { ...ci, saveError: true }]);
+      }
+    }
   }
 
-  function addToCart() {
+  function handleCardClick(item: MenuItem) {
+    if (selectedItem?.id === item.id) {
+      setSelectedItem(null);
+    } else {
+      setSelectedItem(item);
+      setSelectedMods([]);
+      setSpecialInstructions("");
+    }
+  }
+
+  // IF YOU ARE SEEING THIS AFTER JUNE 9TH 2026, DELETE THIS FUCKING THING
+  // function handleCardClick(item: MenuItem) {
+  //   const hasMods = menu.some(
+  //     (m) => m.parent_item_id === item.id && m.is_active,
+  //   );
+  //   if (hasMods) {
+  //     if (selectedItem?.id === item.id) {
+  //       setSelectedItem(null);
+  //     } else {
+  //       setSelectedItem(item);
+  //       setSelectedMods([]);
+  //       setSpecialInstructions("");
+  //     }
+  //     return;
+  //   }
+  //   handleAddItem(item, [], "");
+  // }
+
+  function handleAddToCartFromCustomizer() {
     if (!selectedItem) return;
-    const id = cartItemId(selectedItem, selectedMods);
-    setCart((prev) => {
-      const existing = prev.find((ci) => ci.id === id);
-      if (existing && !specialInstructions) {
-        return prev.map((ci) =>
-          ci.id === id ? { ...ci, quantity: ci.quantity + 1 } : ci,
-        );
-      }
-      return [
-        ...prev,
-        {
-          id: specialInstructions ? `${id}-${Date.now()}` : id,
-          menuItem: selectedItem,
-          quantity: 1,
-          selectedModifiers: selectedMods,
-          specialInstructions,
-        },
-      ];
-    });
+    handleAddItem(selectedItem, selectedMods, specialInstructions);
     setSelectedItem(null);
     setSelectedMods([]);
     setSpecialInstructions("");
   }
 
-  function updateQty(cartId: string, delta: number) {
-    setCart((prev) =>
-      prev
-        .map((ci) =>
-          ci.id === cartId ? { ...ci, quantity: ci.quantity + delta } : ci,
-        )
-        .filter((ci) => ci.quantity > 0),
+  function toggleMod(mod: MenuItem) {
+    const group = MODIFIER_GROUPS.find(
+      (g) => mod.sort_order >= g.min && mod.sort_order <= g.max,
     );
+    setSelectedMods((prev) =>
+      prev.some((m) => m.id === mod.id)
+        ? prev.filter((m) => m.id !== mod.id)
+        : group?.single
+          ? [
+              ...prev.filter(
+                (m) => m.sort_order < group.min || m.sort_order > group.max,
+              ),
+              mod,
+            ]
+          : [...prev, mod],
+    );
+  }
+
+  function itemCartQty(itemId: number): number {
+    return cart
+      .filter((ci) => ci.menuItem.id === itemId)
+      .reduce((acc, ci) => acc + ci.quantity, 0);
   }
 
   function cartTotal() {
@@ -239,30 +376,34 @@ export function OrderEntryDrawer({
     }, 0);
   }
 
-  async function submitOrder() {
-    if (cart.length === 0) return;
-    setSubmitting(true);
-    setError("");
+  async function handleFireToKitchen() {
+    if (!orderIdRef.current) return;
+    if (cart.some((ci) => ci.saving)) return;
+    setFiring(true);
+    setFireError("");
     try {
-      const order = await createOrder({ booking_id: bookingId });
-      for (const ci of cart) {
-        await addOrderItem(order.id, {
-          menu_item_id: ci.menuItem.id,
-          quantity: ci.quantity,
-          unit_price: ci.menuItem.price,
-          modifier_ids: ci.selectedModifiers.map((m) => m.id),
-          special_instructions: ci.specialInstructions || null,
-        });
-      }
-      if (isLiveService) await fireOrder(order.id);
+      if (isLiveService) await fireOrder(orderIdRef.current);
       onOrderUpdated();
       onClose();
     } catch {
-      setError("Order submission failed. Please try again.");
+      setFireError("Failed to fire order. Please try again.");
     } finally {
-      setSubmitting(false);
+      setFiring(false);
     }
   }
+
+  const savingCount = cart.filter((ci) => ci.saving).length;
+  const errorCount = cart.filter((ci) => ci.saveError).length;
+  const savedCount = cart.filter((ci) => ci.savedItemId !== null).length;
+  const canFire =
+    cart.length > 0 && savingCount === 0 && errorCount === 0 && !fireError;
+
+  const visibleItems = menu.filter(
+    (i) => i.category === activeCategory && !i.is_modifier && i.is_active,
+  );
+  const availableMods = selectedItem
+    ? menu.filter((m) => m.parent_item_id === selectedItem.id && m.is_active)
+    : [];
 
   if (loading)
     return (
@@ -301,6 +442,43 @@ export function OrderEntryDrawer({
         alignItems: "stretch",
       }}
     >
+      {firing && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 10,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "16px",
+          }}
+        >
+          <div
+            style={{
+              width: "48px",
+              height: "48px",
+              border: "4px solid rgba(255,255,255,0.2)",
+              borderTopColor: "white",
+              borderRadius: "50%",
+              animation: "spin 0.7s linear infinite",
+            }}
+          />
+          <div
+            style={{
+              color: "white",
+              fontSize: "15px",
+              fontWeight: 600,
+              fontFamily: "var(--font-display)",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Sending to kitchen...
+          </div>
+        </div>
+      )}
       <div
         style={{
           display: "flex",
@@ -312,9 +490,10 @@ export function OrderEntryDrawer({
           overflow: "hidden",
           boxShadow: "0 25px 60px rgba(0,0,0,0.3)",
           background: "var(--zinc-50)",
+          position: "relative",
         }}
       >
-        {/* ── LEFT: Menu ── */}
+        {/* LEFT: Menu */}
         <div
           style={{
             flex: 1,
@@ -323,7 +502,6 @@ export function OrderEntryDrawer({
             background: "var(--bg-surface)",
           }}
         >
-          {/* Header */}
           <div
             style={{
               padding: "1rem 1.25rem",
@@ -342,7 +520,7 @@ export function OrderEntryDrawer({
                 }}
               >
                 {isPreorder ? "Pre-order" : "Order"} —{" "}
-                {memberName ?? `Booking #${bookingId}`}
+                {memberName ?? roomName ?? `Booking #${bookingId}`}
               </div>
               <div
                 style={{
@@ -379,7 +557,6 @@ export function OrderEntryDrawer({
             </button>
           </div>
 
-          {/* Category tabs */}
           <div
             style={{
               display: "flex",
@@ -422,7 +599,6 @@ export function OrderEntryDrawer({
             ))}
           </div>
 
-          {/* Menu grid */}
           <div style={{ flex: 1, overflowY: "auto", padding: "1rem" }}>
             <div
               style={{
@@ -438,7 +614,6 @@ export function OrderEntryDrawer({
                 const isSelected = selectedItem?.id === item.id;
                 const qtyInCart = itemCartQty(item.id);
                 const inCart = qtyInCart > 0;
-
                 return (
                   <button
                     key={item.id}
@@ -462,7 +637,6 @@ export function OrderEntryDrawer({
                       position: "relative" as const,
                     }}
                   >
-                    {/* Cart qty badge */}
                     {inCart && (
                       <span
                         style={{
@@ -481,7 +655,6 @@ export function OrderEntryDrawer({
                         {qtyInCart}
                       </span>
                     )}
-
                     <div
                       style={{
                         fontSize: "13px",
@@ -518,15 +691,17 @@ export function OrderEntryDrawer({
                         marginTop: "auto",
                       }}
                     >
-                      <span
-                        style={{
-                          fontSize: "14px",
-                          fontWeight: 700,
-                          color: isSelected ? "white" : "var(--zinc-800)",
-                        }}
-                      >
-                        ${item.price.toFixed(2)}
-                      </span>
+                      {isStaffOrAdmin && (
+                        <span
+                          style={{
+                            fontSize: "14px",
+                            fontWeight: 700,
+                            color: isSelected ? "white" : "var(--zinc-800)",
+                          }}
+                        >
+                          ${item.price.toFixed(2)}
+                        </span>
+                      )}
                       <div
                         style={{
                           display: "flex",
@@ -573,7 +748,6 @@ export function OrderEntryDrawer({
               )}
             </div>
 
-            {/* Modifier panel */}
             {selectedItem && (
               <div
                 style={{
@@ -598,13 +772,15 @@ export function OrderEntryDrawer({
                     <div style={{ fontWeight: 600, fontSize: "14px" }}>
                       {selectedItem.name}
                     </div>
-                    <div style={{ fontSize: "11px", opacity: 0.7 }}>
-                      ${selectedItem.price.toFixed(2)}
-                    </div>
+                    {isStaffOrAdmin && (
+                      <div style={{ fontSize: "11px", opacity: 0.7 }}>
+                        ${selectedItem.price.toFixed(2)}
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"
-                    onClick={addToCart}
+                    onClick={handleAddToCartFromCustomizer}
                     style={{
                       background: "#16a34a",
                       color: "white",
@@ -622,7 +798,6 @@ export function OrderEntryDrawer({
                     <Plus size={14} /> Add to Order
                   </button>
                 </div>
-
                 {availableMods.length > 0 && (
                   <div style={{ padding: "0.875rem 1rem" }}>
                     <div
@@ -637,48 +812,99 @@ export function OrderEntryDrawer({
                     >
                       Customize
                     </div>
-                    <div
-                      style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}
-                    >
-                      {availableMods.map((mod) => {
-                        const active = selectedMods.some(
-                          (m) => m.id === mod.id,
-                        );
-                        return (
-                          <button
-                            key={mod.id}
-                            type="button"
-                            onClick={() => toggleMod(mod)}
+                    {/* FIXME: sort_order-based grouping is a hack — replace with modifier_group column on menu_items */}
+                    {MODIFIER_GROUPS.map(({ label, min, max, single }) => {
+                      const mods = availableMods.filter(
+                        (m) => m.sort_order >= min && m.sort_order <= max,
+                      );
+                      if (mods.length === 0) return null;
+                      return (
+                        <div
+                          key={label ?? "misc"}
+                          style={{ marginBottom: "12px" }}
+                        >
+                          <div
                             style={{
-                              padding: "6px 12px",
-                              borderRadius: "var(--radius-sm)",
-                              fontSize: "12px",
-                              border: `1.5px solid ${active ? "var(--zinc-900)" : "var(--zinc-200)"}`,
-                              background: active
-                                ? "var(--zinc-900)"
-                                : "var(--bg-surface)",
-                              color: active ? "white" : "var(--zinc-700)",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "6px",
-                              fontWeight: active ? 600 : 400,
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              color: "var(--zinc-400)",
+                              textTransform: "uppercase" as const,
+                              letterSpacing: "0.06em",
+                              marginBottom: "6px",
                             }}
                           >
-                            {active && <Check size={11} />}
-                            {mod.name}
-                            {mod.price > 0 && (
-                              <span style={{ fontSize: "11px", opacity: 0.75 }}>
-                                +${mod.price.toFixed(2)}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                            {label}
+                            <span
+                              style={{
+                                color: "var(--zinc-300)",
+                                fontWeight: 600,
+                                marginLeft: "6px",
+                              }}
+                            >
+                              {single ? "Choose one" : "Choose any"}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: "6px",
+                            }}
+                          >
+                            {mods.map((mod) => {
+                              const active = selectedMods.some(
+                                (m) => m.id === mod.id,
+                              );
+                              return (
+                                <button
+                                  key={mod.id}
+                                  type="button"
+                                  onClick={() => toggleMod(mod)}
+                                  style={{
+                                    padding: "6px 12px",
+                                    borderRadius: "var(--radius-sm)",
+                                    fontSize: "12px",
+                                    border: `1.5px solid ${active ? "var(--zinc-900)" : "var(--zinc-200)"}`,
+                                    background: active
+                                      ? "var(--zinc-900)"
+                                      : "var(--bg-surface)",
+                                    color: active ? "white" : "var(--zinc-700)",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    fontWeight: active ? 600 : 400,
+                                    minWidth: "fit-content",
+                                    whiteSpace: "nowrap" as const,
+                                  }}
+                                >
+                                  <Check
+                                    size={11}
+                                    style={{
+                                      opacity: active ? 1 : 0,
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  {mod.name}
+                                  {isStaffOrAdmin && mod.price > 0 && (
+                                    <span
+                                      style={{
+                                        fontSize: "11px",
+                                        opacity: 0.75,
+                                      }}
+                                    >
+                                      +${mod.price.toFixed(2)}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-
                 <div style={{ padding: "0 1rem 0.875rem" }}>
                   <input
                     type="text"
@@ -701,7 +927,7 @@ export function OrderEntryDrawer({
           </div>
         </div>
 
-        {/* ── RIGHT: Cart ── */}
+        {/* RIGHT: Cart */}
         <div
           style={{
             width: "300px",
@@ -722,6 +948,18 @@ export function OrderEntryDrawer({
             }}
           >
             Order ({cart.reduce((a, ci) => a + ci.quantity, 0)} items)
+            {savingCount > 0 && (
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: "var(--zinc-400)",
+                  marginLeft: "8px",
+                  fontFamily: "var(--font-body)",
+                }}
+              >
+                saving...
+              </span>
+            )}
           </div>
 
           <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem" }}>
@@ -749,10 +987,12 @@ export function OrderEntryDrawer({
                     <div
                       key={ci.id}
                       style={{
-                        background: "var(--zinc-50)",
+                        background: ci.saveError ? "#fff5f5" : "var(--zinc-50)",
                         borderRadius: "var(--radius-sm)",
                         padding: "0.75rem",
-                        border: "1px solid var(--zinc-100)",
+                        border: `1px solid ${ci.saveError ? "#fecaca" : "var(--zinc-100)"}`,
+                        opacity: ci.saving ? 0.7 : 1,
+                        transition: "opacity 0.15s ease",
                       }}
                     >
                       <div
@@ -768,9 +1008,21 @@ export function OrderEntryDrawer({
                               fontSize: "13px",
                               fontWeight: 600,
                               color: "var(--zinc-900)",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
                             }}
                           >
                             {ci.menuItem.name}
+                            {ci.saving && (
+                              <Loader2
+                                size={11}
+                                style={{
+                                  color: "var(--zinc-400)",
+                                  animation: "spin 1s linear infinite",
+                                }}
+                              />
+                            )}
                           </div>
                           {ci.selectedModifiers.map((m) => (
                             <div
@@ -796,20 +1048,33 @@ export function OrderEntryDrawer({
                               "{ci.specialInstructions}"
                             </div>
                           )}
+                          {ci.saveError && (
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "#dc2626",
+                                marginTop: "4px",
+                                fontWeight: 600,
+                              }}
+                            >
+                              Failed to save — tap × to remove
+                            </div>
+                          )}
                         </div>
-                        <div
-                          style={{
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            color: "var(--zinc-800)",
-                            marginLeft: "8px",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          ${lineTotal.toFixed(2)}
-                        </div>
+                        {isStaffOrAdmin && (
+                          <div
+                            style={{
+                              fontSize: "13px",
+                              fontWeight: 600,
+                              color: "var(--zinc-800)",
+                              marginLeft: "8px",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            ${lineTotal.toFixed(2)}
+                          </div>
+                        )}
                       </div>
-
                       <div
                         style={{
                           display: "flex",
@@ -818,60 +1083,23 @@ export function OrderEntryDrawer({
                           marginTop: "8px",
                         }}
                       >
-                        <button
-                          type="button"
-                          onClick={() => updateQty(ci.id, -1)}
-                          style={{
-                            width: "24px",
-                            height: "24px",
-                            borderRadius: "50%",
-                            border: "1px solid var(--zinc-200)",
-                            background: "var(--bg-surface)",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Minus size={11} />
-                        </button>
                         <span
-                          style={{
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            minWidth: "20px",
-                            textAlign: "center",
-                          }}
+                          style={{ fontSize: "12px", color: "var(--zinc-500)" }}
                         >
-                          {ci.quantity}
+                          ×{ci.quantity}
                         </span>
                         <button
                           type="button"
-                          onClick={() => updateQty(ci.id, 1)}
-                          style={{
-                            width: "24px",
-                            height: "24px",
-                            borderRadius: "50%",
-                            border: "1px solid var(--zinc-200)",
-                            background: "var(--bg-surface)",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Plus size={11} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateQty(ci.id, -ci.quantity)}
+                          onClick={() => handleRemoveItem(ci.id)}
+                          disabled={ci.saving}
                           style={{
                             marginLeft: "auto",
                             background: "none",
                             border: "none",
-                            cursor: "pointer",
+                            cursor: ci.saving ? "not-allowed" : "pointer",
                             color: "var(--zinc-400)",
                             padding: "2px",
+                            opacity: ci.saving ? 0.4 : 1,
                           }}
                         >
                           <X size={13} />
@@ -900,9 +1128,9 @@ export function OrderEntryDrawer({
               }}
             >
               <span>Total</span>
-              <span>${cartTotal().toFixed(2)}</span>
+              {isStaffOrAdmin && <span>${cartTotal().toFixed(2)}</span>}
             </div>
-            {error && (
+            {fireError && (
               <div
                 style={{
                   fontSize: "12px",
@@ -910,39 +1138,93 @@ export function OrderEntryDrawer({
                   marginBottom: "8px",
                 }}
               >
-                {error}
+                {fireError}
               </div>
             )}
-            <button
-              type="button"
-              className="btn-primary btn-block"
-              disabled={cart.length === 0 || submitting}
-              onClick={submitOrder}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-              }}
-            >
-              <Send size={14} />
-              {submitting
-                ? "Submitting..."
-                : isLiveService
-                  ? "Fire to Kitchen"
-                  : "Confirm Pre-order"}
-            </button>
+            {savingCount > 0 && (
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "var(--zinc-400)",
+                  marginBottom: "8px",
+                  textAlign: "center",
+                }}
+              >
+                Saving {savingCount} item{savingCount !== 1 ? "s" : ""}...
+              </div>
+            )}
+            {isLiveService ? (
+              <button
+                type="button"
+                className="btn-primary btn-block"
+                disabled={!canFire || firing}
+                onClick={handleFireToKitchen}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  position: "relative",
+                  overflow: "hidden",
+                  transition: "all 0.2s ease",
+                  background: firing ? "#166534" : undefined,
+                }}
+              >
+                {firing ? (
+                  <>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: "14px",
+                        height: "14px",
+                        border: "2px solid rgba(255,255,255,0.3)",
+                        borderTopColor: "white",
+                        borderRadius: "50%",
+                        animation: "spin 0.7s linear infinite",
+                        flexShrink: 0,
+                      }}
+                    />
+                    Sending to kitchen...
+                  </>
+                ) : (
+                  <>
+                    <Send size={14} />
+                    Fire to Kitchen
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-primary btn-block"
+                disabled={!canFire}
+                onClick={() => {
+                  onOrderUpdated();
+                  onClose();
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                }}
+              >
+                <Check size={14} />
+                {savedCount > 0 ? "Save & Close" : "Done"}
+              </button>
+            )}
             <button
               type="button"
               className="btn-ghost btn-block"
               onClick={onClose}
               style={{ marginTop: "8px", fontSize: "13px" }}
             >
-              Cancel
+              {cart.length === 0 ? "Close" : "Close without firing"}
             </button>
           </div>
         </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import type { AuthUser, LoginRequest } from "../types/auth";
 
 const USER_ID_KEY = "apr_user_id";
 const ROLE_KEY = "apr_role";
+const SUB_ROLE_KEY = "apr_sub_role";
 const FORCE_PW_KEY = "apr_force_pw_change";
 
 function readStoredUser(): AuthUser | null {
@@ -19,6 +20,7 @@ function readStoredUser(): AuthUser | null {
     token,
     userId: Number(userId),
     role: role as AuthUser["role"],
+    sub_role: localStorage.getItem(SUB_ROLE_KEY) ?? undefined,
   };
 }
 
@@ -45,11 +47,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token: response.access_token,
         userId: response.user_id,
         role: response.role,
+        sub_role: (response as any).sub_role ?? undefined,
       };
 
       authStorage.setToken(nextUser.token);
       localStorage.setItem(USER_ID_KEY, String(nextUser.userId));
       localStorage.setItem(ROLE_KEY, nextUser.role);
+      if (nextUser.sub_role)
+        localStorage.setItem(SUB_ROLE_KEY, nextUser.sub_role);
+      else localStorage.removeItem(SUB_ROLE_KEY);
       localStorage.setItem(
         FORCE_PW_KEY,
         response.force_password_change ? "1" : "0",
@@ -67,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authStorage.clearToken();
     localStorage.removeItem(USER_ID_KEY);
     localStorage.removeItem(ROLE_KEY);
+    localStorage.removeItem(SUB_ROLE_KEY);
     localStorage.removeItem(FORCE_PW_KEY);
     setUser(null);
     setForcePasswordChange(false);

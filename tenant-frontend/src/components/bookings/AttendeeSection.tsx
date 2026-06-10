@@ -11,6 +11,7 @@ export type GuestForm = {
   first_name: string;
   last_name: string;
   dietary_flags: string[];
+  dietary_other_note: string;
   is_member_guest: boolean;
   linked_member_id: number | null;
 };
@@ -30,6 +31,7 @@ function makeGuest(overrides: Partial<GuestForm> = {}): GuestForm {
     first_name: "",
     last_name: "",
     dietary_flags: [],
+    dietary_other_note: "",
     is_member_guest: false,
     linked_member_id: null,
     ...overrides,
@@ -118,6 +120,7 @@ export function AttendeeSection({
         is_member_guest: true,
         linked_member_id: member.id,
         dietary_flags: member.dietary_flags,
+        dietary_other_note: member.dietary_other_note ?? "",
       }),
     ]);
   }
@@ -164,6 +167,8 @@ export function AttendeeSection({
                   {member.dietary_flags.length > 0 && (
                     <span className="member-card__dietary">
                       {member.dietary_flags.join(", ")}
+                      {member.dietary_other_note &&
+                        ` — ${member.dietary_other_note}`}
                     </span>
                   )}
                 </label>
@@ -250,6 +255,24 @@ export function AttendeeSection({
                     </label>
                   </div>
                 ))}
+                {guest.dietary_flags.includes("OTHER") && (
+                  <input
+                    type="text"
+                    placeholder="Please describe the dietary restriction..."
+                    value={guest.dietary_other_note}
+                    disabled={guest.is_member_guest}
+                    onChange={(e) =>
+                      onGuestsChange(
+                        guests.map((g) =>
+                          g.id === guest.id
+                            ? { ...g, dietary_other_note: e.target.value }
+                            : g,
+                        ),
+                      )
+                    }
+                    style={{ marginTop: "6px", width: "100%" }}
+                  />
+                )}
               </div>
             ))}
           </div>

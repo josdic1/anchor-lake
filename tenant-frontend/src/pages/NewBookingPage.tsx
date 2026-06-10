@@ -134,14 +134,24 @@ export function NewBookingPage() {
     );
 
     if (autoMealType === null) {
-      setArrivalError(
-        "No service available at this time. Please check hours of operation.",
-      );
-      setForm((prev) => ({
-        ...prev,
-        estimatedArrival: timeString,
-        mealType: "",
-      }));
+      if (isStaffOrAdmin) {
+        // Admin/staff exception: outside normal service hours books as AFTERHOURS
+        setForm((prev) => ({
+          ...prev,
+          estimatedArrival: timeString,
+          mealType: "AFTERHOURS",
+        }));
+        fetchRooms(form.bookingDate, "AFTERHOURS");
+      } else {
+        setArrivalError(
+          "No service available at this time. Please check hours of operation.",
+        );
+        setForm((prev) => ({
+          ...prev,
+          estimatedArrival: timeString,
+          mealType: "",
+        }));
+      }
       return;
     }
 

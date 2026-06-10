@@ -24,6 +24,7 @@ export interface OrderItem {
   unit_price: number;
   special_instructions: string | null;
   modifier_ids: number[];
+  voided: boolean;
 }
 
 export interface CreateOrderPayload {
@@ -59,9 +60,7 @@ export async function getOrder(orderId: number): Promise<Order> {
 }
 
 export async function cancelOrder(orderId: number): Promise<void> {
-  const items = await getOrderItems(orderId);
-
-  await Promise.all(items.map((item) => removeOrderItem(orderId, item.id)));
+  await ordersApi.delete(`/orders/${orderId}`);
 }
 
 export async function getOrCreateOpenOrder(
@@ -139,4 +138,11 @@ export async function getKitchenInKitchen(): Promise<Order[]> {
 export async function getKitchenReady(): Promise<Order[]> {
   const response = await ordersApi.get<Order[]>("/kitchen/ready");
   return response.data;
+}
+
+export async function voidOrderItem(
+  orderId: number,
+  itemId: number,
+): Promise<void> {
+  await ordersApi.patch(`/orders/${orderId}/items/${itemId}/void`);
 }

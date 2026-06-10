@@ -4,6 +4,7 @@ export type MenuCategory =
   | "STARTER"
   | "MAIN"
   | "SIDE"
+  | "KIDS"
   | "DESSERT"
   | "DRINK"
   | "SPECIAL";

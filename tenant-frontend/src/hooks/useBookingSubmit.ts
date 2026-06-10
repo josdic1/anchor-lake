@@ -43,16 +43,31 @@ export function useBookingSubmit() {
         confirm_immediately: mode === "confirmed",
         on_behalf_of_user_id: onBehalfOfUserId ?? null,
         attendees: {
-          member_ids: selectedMembers.map((m) => m.id),
-          guests: guests
-            .filter((g) => g.first_name.trim() && g.last_name.trim())
-            .map((g) => ({
-              first_name: g.first_name.trim(),
-              last_name: g.last_name.trim(),
-              linked_member_id: g.linked_member_id ?? null,
-              is_member_guest: g.is_member_guest,
-              dietary_flags: g.dietary_flags,
+          member_ids: [],
+          guests: [
+            ...selectedMembers.map((m) => ({
+              first_name: m.first_name.trim(),
+              last_name: m.last_name.trim(),
+              linked_member_id: m.id,
+              is_member_guest: false,
+              dietary_flags: m.dietary_flags,
+              dietary_other_note: m.dietary_flags.includes("OTHER")
+                ? m.dietary_other_note || null
+                : null,
             })),
+            ...guests
+              .filter((g) => g.first_name.trim() && g.last_name.trim())
+              .map((g) => ({
+                first_name: g.first_name.trim(),
+                last_name: g.last_name.trim(),
+                linked_member_id: g.linked_member_id ?? null,
+                is_member_guest: g.is_member_guest,
+                dietary_flags: g.dietary_flags,
+                dietary_other_note: g.dietary_flags.includes("OTHER")
+                  ? g.dietary_other_note || null
+                  : null,
+              })),
+          ],
         },
       });
 

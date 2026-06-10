@@ -12,6 +12,7 @@ import { getMenuItems } from "../api/menu";
 import { roomsApi } from "../api/client";
 import { KitchenCard } from "./KitchenCard";
 import type { Room } from "../types/booking";
+import { useAuth } from "../hooks/useAuth";
 
 export function StaffServiceBoard() {
   const [incoming, setIncoming] = useState<Order[]>([]);
@@ -19,6 +20,10 @@ export function StaffServiceBoard() {
   const [ready, setReady] = useState<Order[]>([]);
   const [menuMap, setMenuMap] = useState<Record<number, string>>({});
   const [roomMap, setRoomMap] = useState<Record<number, string>>({});
+  const { user } = useAuth();
+  const isKitchenOnly = user?.sub_role === "kitchen";
+  const isWaitOnly = user?.sub_role === "wait";
+  const isAdmin = user?.role === "admin";
 
   const loadOrders = async () => {
     try {
@@ -95,7 +100,9 @@ export function StaffServiceBoard() {
                 menuMap={menuMap}
                 roomMap={roomMap}
                 nextLabel="FIRE TO KITCHEN"
-                onNext={() => handleFire(order.id)}
+                onNext={!isKitchenOnly ? () => handleFire(order.id) : undefined}
+                isAdmin={isAdmin}
+                onAction={loadOrders}
               />
             ))}
             {incoming.length === 0 && <EmptyColumn />}
@@ -124,7 +131,9 @@ export function StaffServiceBoard() {
                 menuMap={menuMap}
                 roomMap={roomMap}
                 nextLabel="MARK READY"
-                onNext={() => handleReady(order.id)}
+                onNext={!isWaitOnly ? () => handleReady(order.id) : undefined}
+                isAdmin={isAdmin}
+                onAction={loadOrders}
               />
             ))}
             {inKitchen.length === 0 && <EmptyColumn />}
@@ -153,7 +162,11 @@ export function StaffServiceBoard() {
                 menuMap={menuMap}
                 roomMap={roomMap}
                 nextLabel="MARK SERVED"
-                onNext={() => handleServed(order.id)}
+                onNext={
+                  !isKitchenOnly ? () => handleServed(order.id) : undefined
+                }
+                isAdmin={isAdmin}
+                onAction={loadOrders}
               />
             ))}
             {ready.length === 0 && <EmptyColumn />}

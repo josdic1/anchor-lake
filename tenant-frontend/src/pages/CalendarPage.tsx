@@ -213,7 +213,11 @@ export function CalendarPage() {
                         <span className="event-time">
                           {b.estimated_arrival.slice(0, 5)}
                         </span>
-                        <span className="event-name">Booking #{b.id}</span>
+                        <span className="event-name">
+                          {(b as any).primary_first_name
+                            ? `${(b as any).primary_first_name} ${((b as any).primary_last_name ?? "").charAt(0)}.`
+                            : `#${b.id}`}
+                        </span>
                       </button>
                     ))}
 

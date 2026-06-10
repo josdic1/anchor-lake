@@ -10,6 +10,7 @@ export interface HouseholdMember {
   last_name: string;
   relation: MemberRelation;
   dietary_flags: string[];
+  dietary_other_note?: string | null;
   notes?: string | null;
   is_active: boolean;
 }
@@ -40,6 +41,7 @@ export async function createMember(
     last_name: string;
     relation: MemberRelation;
     dietary_flags: string[];
+    dietary_other_note?: string | null;
     notes?: string | null;
   },
 ): Promise<HouseholdMember> {
@@ -58,6 +60,7 @@ export async function updateMember(
     last_name: string;
     relation: MemberRelation;
     dietary_flags: string[];
+    dietary_other_note: string | null;
     notes: string | null;
   }>,
 ): Promise<HouseholdMember> {

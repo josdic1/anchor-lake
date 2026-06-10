@@ -26,6 +26,7 @@ export type BookingWithRoom = Booking & {
 export type AddMemberAttendeePayload = {
   linked_member_id: number;
   dietary_flags: string[];
+  dietary_other_note?: string | null;
   notes?: string | null;
 };
 
@@ -113,6 +114,7 @@ export async function addMemberAttendee(
       guest_last_name: null,
       is_member_guest: false,
       dietary_flags: payload.dietary_flags,
+      dietary_other_note: payload.dietary_other_note ?? null,
       notes: payload.notes ?? null,
     },
   );
@@ -131,6 +133,7 @@ export async function addGuestAttendee(
       guest_last_name: guest.last_name,
       is_member_guest: guest.is_member_guest,
       dietary_flags: guest.dietary_flags,
+      dietary_other_note: guest.dietary_other_note ?? null,
       notes: null,
     },
   );

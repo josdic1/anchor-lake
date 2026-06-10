@@ -728,15 +728,6 @@ function StarterOrder({
                     </span>
                   )}
                 </div>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: C.textSoft,
-                    fontFamily: F.body,
-                  }}
-                >
-                  ${item.price.toFixed(2)}
-                </div>
               </div>
               <div
                 style={{
@@ -828,6 +819,7 @@ function AttendeeEditor({
   const [gFirst, setGFirst] = useState("");
   const [gLast, setGLast] = useState("");
   const [gDiet, setGDiet] = useState<string[]>([]);
+  const [gDietOther, setGDietOther] = useState("");
   const [saving, setSaving] = useState(false);
   const canEdit = ["DRAFT", "CONFIRMED"].includes(booking.status);
 
@@ -874,6 +866,7 @@ function AttendeeEditor({
       await addMemberAttendee(booking.id, {
         linked_member_id: m.id,
         dietary_flags: m.dietary_flags,
+        dietary_other_note: m.dietary_other_note ?? null,
       });
       onChanged();
       flashAdd(`${m.first_name} added`);
@@ -894,12 +887,14 @@ function AttendeeEditor({
         first_name: gFirst.trim(),
         last_name: gLast.trim(),
         dietary_flags: gDiet,
+        dietary_other_note: gDietOther.trim(),
         is_member_guest: false,
         linked_member_id: null,
       });
       setGFirst("");
       setGLast("");
       setGDiet([]);
+      setGDietOther("");
       setShowGuest(false);
       onChanged();
       flashAdd("Guest added");
@@ -1165,6 +1160,7 @@ function AttendeeEditor({
                         addMemberAttendee(booking.id, {
                           linked_member_id: m.id,
                           dietary_flags: m.dietary_flags,
+                          dietary_other_note: m.dietary_other_note ?? null,
                         })
                           .then(() => {
                             onChanged();
@@ -1342,6 +1338,26 @@ function AttendeeEditor({
                       );
                     })}
                   </div>
+                  {gDiet.includes("OTHER") && (
+                    <input
+                      placeholder="Please describe…"
+                      value={gDietOther}
+                      onChange={(e) => setGDietOther(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        marginTop: "8px",
+                        border: `1.5px solid ${C.border}`,
+                        borderRadius: "10px",
+                        fontSize: "15px",
+                        fontFamily: F.body,
+                        background: C.surface,
+                        color: C.text,
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  )}
                 </div>
               )}
               <div style={{ display: "flex", gap: "8px" }}>
@@ -1440,10 +1456,7 @@ function ExistingOrders({
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {orders.map((order) => {
             const orderItems = items[order.id] ?? [];
-            const total = orderItems.reduce(
-              (sum, i) => sum + i.unit_price * i.quantity,
-              0,
-            );
+
             return (
               <div
                 key={order.id}
@@ -1472,16 +1485,6 @@ function ExistingOrders({
                   >
                     Order #{order.id}
                   </div>
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      fontFamily: F.body,
-                      color: C.text,
-                    }}
-                  >
-                    ${total.toFixed(2)}
-                  </div>
                 </div>
                 <div
                   style={{
@@ -1506,9 +1509,6 @@ function ExistingOrders({
                         {menuNames[item.menu_item_id] ??
                           `Item #${item.menu_item_id}`}{" "}
                         x {item.quantity}
-                      </span>
-                      <span>
-                        ${(item.unit_price * item.quantity).toFixed(2)}
                       </span>
                     </div>
                   ))}

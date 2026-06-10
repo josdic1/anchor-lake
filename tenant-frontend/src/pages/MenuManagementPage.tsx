@@ -23,10 +23,12 @@ const CATEGORIES: MenuCategory[] = [
   "STARTER",
   "MAIN",
   "SIDE",
+  "KIDS",
   "DESSERT",
   "DRINK",
   "SPECIAL",
 ];
+
 const DIETARY_FLAGS = [
   "DAIRY_FREE",
   "EGG_FREE",
@@ -277,7 +279,6 @@ export function MenuManagementPage() {
               size={12}
               className={manualLoading ? "animate-spin" : ""}
             />
-            Test Loader
           </button>
         </div>
         <button className="btn-primary" onClick={openNew}>

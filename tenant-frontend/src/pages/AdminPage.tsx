@@ -10,6 +10,9 @@ import {
   UserPlus,
   AlertTriangle,
   Key,
+  ChevronUp,
+  ChevronDown,
+  Search,
 } from "lucide-react";
 import { usersApi, roomsApi, bookingsApi } from "../api/client";
 import { getAttendees } from "../api/bookings";
@@ -44,7 +47,193 @@ const TAB_DESCRIPTIONS: Record<Tab, string> = {
   bookings: "View and force-update any booking status",
 };
 
-// --- Password Reset Component ---
+function SearchBar({
+  value,
+  onChange,
+  placeholder = "Search...",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        width: "260px",
+      }}
+    >
+      <Search
+        size={13}
+        style={{
+          position: "absolute",
+          left: "10px",
+          color: "var(--zinc-400)",
+          pointerEvents: "none",
+          flexShrink: 0,
+        }}
+      />
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: "100%",
+          padding: "6px 30px 6px 30px",
+          border: "1px solid var(--zinc-200)",
+          borderRadius: "6px",
+          fontSize: "13px",
+          color: "var(--zinc-800)",
+          background: "var(--bg-surface)",
+          outline: "none",
+          transition: "border-color 0.15s ease",
+        }}
+        onFocus={(e) => (e.currentTarget.style.borderColor = "var(--zinc-400)")}
+        onBlur={(e) => (e.currentTarget.style.borderColor = "var(--zinc-200)")}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          style={{
+            position: "absolute",
+            right: "8px",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: "2px",
+            display: "inline-flex",
+            alignItems: "center",
+            color: "var(--zinc-400)",
+            borderRadius: "3px",
+            transition: "color 0.12s ease",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.color = "var(--zinc-700)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.color = "var(--zinc-400)")
+          }
+          title="Clear search"
+        >
+          <X size={12} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+type SortDir = "asc" | "desc";
+
+function useSortable<T>(
+  data: T[],
+  defaultKey: keyof T,
+  defaultDir: SortDir = "asc",
+) {
+  const [sortKey, setSortKey] = useState<keyof T>(defaultKey);
+  const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
+
+  function handleSort(key: keyof T) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sorted = [...data].sort((a, b) => {
+    const av = a[sortKey];
+    const bv = b[sortKey];
+    if (av === null || av === undefined) return 1;
+    if (bv === null || bv === undefined) return -1;
+    let cmp = 0;
+    if (typeof av === "string" && typeof bv === "string") {
+      cmp = av.toLowerCase().localeCompare(bv.toLowerCase());
+    } else if (typeof av === "number" && typeof bv === "number") {
+      cmp = av - bv;
+    } else if (typeof av === "boolean" && typeof bv === "boolean") {
+      cmp = av === bv ? 0 : av ? -1 : 1;
+    } else {
+      cmp = String(av).localeCompare(String(bv));
+    }
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
+  return { sorted, sortKey, sortDir, handleSort };
+}
+
+function SortableTh({
+  children,
+  sortKey,
+  activeSortKey,
+  sortDir,
+  onSort,
+}: {
+  children: React.ReactNode;
+  sortKey: string;
+  activeSortKey: string;
+  sortDir: SortDir;
+  onSort: (key: any) => void;
+}) {
+  const isActive = sortKey === activeSortKey;
+  return (
+    <th
+      onClick={() => onSort(sortKey)}
+      style={{
+        padding: "0.625rem 1rem",
+        fontSize: "10px",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase" as const,
+        color: isActive ? "var(--zinc-800)" : "var(--zinc-500)",
+        background: "var(--zinc-50)",
+        borderBottom: "1px solid var(--zinc-200)",
+        textAlign: "left" as const,
+        cursor: "pointer",
+        userSelect: "none",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span
+        style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
+      >
+        {children}
+        <span
+          style={{
+            display: "inline-flex",
+            flexDirection: "column",
+            gap: "1px",
+            opacity: isActive ? 1 : 0.3,
+          }}
+        >
+          <ChevronUp
+            size={9}
+            style={{
+              marginBottom: "-2px",
+              color:
+                isActive && sortDir === "asc"
+                  ? "var(--zinc-900)"
+                  : "var(--zinc-400)",
+            }}
+          />
+          <ChevronDown
+            size={9}
+            style={{
+              color:
+                isActive && sortDir === "desc"
+                  ? "var(--zinc-900)"
+                  : "var(--zinc-400)",
+            }}
+          />
+        </span>
+      </span>
+    </th>
+  );
+}
+
 function PasswordResetModal({
   userId,
   userEmail,
@@ -114,24 +303,35 @@ function PasswordResetModal({
   );
 }
 
-// ─── Needs Attention ──────────────────────────────────────────────────────────
-
 function NeedsAttention({ refreshKey }: { refreshKey: number }) {
   const [stuck, setStuck] = useState<any[]>([]);
+  const [attendeeMap, setAttendeeMap] = useState<Record<number, Attendee[]>>(
+    {},
+  );
   const [completing, setCompleting] = useState<number | null>(null);
   const [completingAll, setCompletingAll] = useState(false);
-
   const today = new Date().toISOString().slice(0, 10);
 
   async function load() {
     try {
       const res = await bookingsApi.get("/bookings");
-      setStuck(
-        res.data.filter(
-          (b: any) =>
-            ["SEATED", "SERVICE"].includes(b.status) && b.booking_date < today,
-        ),
+      const stuckBookings = res.data.filter(
+        (b: any) =>
+          ["SEATED", "SERVICE"].includes(b.status) && b.booking_date < today,
       );
+      setStuck(stuckBookings);
+
+      const entries = await Promise.all(
+        stuckBookings.map(async (b: any) => {
+          try {
+            const attendees = await getAttendees(b.id);
+            return [b.id, attendees] as [number, Attendee[]];
+          } catch {
+            return [b.id, []] as [number, Attendee[]];
+          }
+        }),
+      );
+      setAttendeeMap(Object.fromEntries(entries));
     } catch {}
   }
 
@@ -142,9 +342,7 @@ function NeedsAttention({ refreshKey }: { refreshKey: number }) {
   async function complete(id: number) {
     setCompleting(id);
     try {
-      await bookingsApi.patch(`/bookings/${id}/status`, {
-        status: "COMPLETED",
-      });
+      await bookingsApi.post(`/bookings/${id}/actions/complete`);
       setStuck((prev) => prev.filter((b) => b.id !== id));
     } finally {
       setCompleting(null);
@@ -156,9 +354,7 @@ function NeedsAttention({ refreshKey }: { refreshKey: number }) {
     try {
       await Promise.all(
         stuck.map((b) =>
-          bookingsApi.patch(`/bookings/${b.id}/status`, {
-            status: "COMPLETED",
-          }),
+          bookingsApi.post(`/bookings/${b.id}/actions/complete`),
         ),
       );
       setStuck([]);
@@ -213,61 +409,77 @@ function NeedsAttention({ refreshKey }: { refreshKey: number }) {
         </button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-        {stuck.map((b) => (
-          <div
-            key={b.id}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "10px 14px",
-              background: "white",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid #fde68a",
-            }}
-          >
-            <div style={{ fontSize: "13px", color: "#78350f" }}>
-              <strong>#{b.id}</strong> · {b.booking_date} · {b.meal_type} ·{" "}
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "1px 7px",
-                  borderRadius: "3px",
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  background: b.status === "SERVICE" ? "#fef3c7" : "#dbeafe",
-                  color: b.status === "SERVICE" ? "#92400e" : "#1e40af",
-                }}
-              >
-                {b.status}
-              </span>
-            </div>
-            <button
-              onClick={() => complete(b.id)}
-              disabled={completing === b.id}
+        {stuck.map((b) => {
+          const attendees = attendeeMap[b.id] ?? [];
+          const primary =
+            attendees.find((a) => a.linked_member_id && !a.is_member_guest) ??
+            attendees[0];
+          const accountName = primary
+            ? `${primary.guest_first_name ?? ""} ${primary.guest_last_name ?? ""}`.trim()
+            : null;
+
+          return (
+            <div
+              key={b.id}
               style={{
-                padding: "4px 12px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "10px 14px",
+                background: "white",
                 borderRadius: "var(--radius-sm)",
-                border: "1px solid #d97706",
-                background: "transparent",
-                color: "#92400e",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: completing === b.id ? "not-allowed" : "pointer",
-                opacity: completing === b.id ? 0.5 : 1,
+                border: "1px solid #fde68a",
               }}
             >
-              {completing === b.id ? "..." : "Complete"}
-            </button>
-          </div>
-        ))}
+              <div style={{ fontSize: "13px", color: "#78350f" }}>
+                <strong>{accountName ?? `#${b.id}`}</strong>
+                {accountName && (
+                  <span style={{ color: "#a16207", fontWeight: 400 }}>
+                    {" "}
+                    · #{b.id}
+                  </span>
+                )}
+                {" · "}
+                {b.booking_date} · {b.meal_type}{" "}
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "1px 7px",
+                    borderRadius: "3px",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    background: b.status === "SERVICE" ? "#fef3c7" : "#dbeafe",
+                    color: b.status === "SERVICE" ? "#92400e" : "#1e40af",
+                  }}
+                >
+                  {b.status}
+                </span>
+              </div>
+              <button
+                onClick={() => complete(b.id)}
+                disabled={completing === b.id}
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid #d97706",
+                  background: "transparent",
+                  color: "#92400e",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: completing === b.id ? "not-allowed" : "pointer",
+                  opacity: completing === b.id ? 0.5 : 1,
+                }}
+              >
+                {completing === b.id ? "..." : "Complete"}
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
-
-// ─── Shared Components ────────────────────────────────────────────────────────
 
 function Badge({
   label,
@@ -467,7 +679,12 @@ function InlineEdit({
   );
 }
 
-// ─── USERS TAB ────────────────────────────────────────────────────────────────
+const SUB_ROLE_OPTIONS = [
+  { value: "", label: "None" },
+  { value: "wait", label: "Wait Staff" },
+  { value: "kitchen", label: "Kitchen" },
+  { value: "manager", label: "Manager" },
+];
 
 function UsersTab() {
   const [users, setUsers] = useState<any[]>([]);
@@ -478,6 +695,7 @@ function UsersTab() {
   const [editVal, setEditVal] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [resettingUser, setResettingUser] = useState<any>(null);
+  const [search, setSearch] = useState("");
   const [newForm, setNewForm] = useState({
     first_name: "",
     last_name: "",
@@ -485,9 +703,26 @@ function UsersTab() {
     password: "",
     role: "member",
     member_number: "",
+    sub_role: "",
   });
   const [saving, setSaving] = useState(false);
   const [formErr, setFormErr] = useState("");
+
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(users, "id");
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? sorted.filter(
+        (u) =>
+          `${u.first_name} ${u.last_name}`.toLowerCase().includes(q) ||
+          (u.email ?? "").toLowerCase().includes(q) ||
+          (u.role ?? "").toLowerCase().includes(q) ||
+          (u.sub_role ?? "").toLowerCase().includes(q) ||
+          String(u.member_number ?? "")
+            .toLowerCase()
+            .includes(q) ||
+          String(u.id).includes(q),
+      )
+    : sorted;
 
   const refreshUsers = () => {
     setLoading(true);
@@ -519,6 +754,13 @@ function UsersTab() {
     setEditingId(null);
   }
 
+  async function saveSubRole(userId: number, sub_role: string) {
+    const updated = await usersApi.patch(`/users/${userId}`, {
+      sub_role: sub_role || null,
+    });
+    setUsers((prev) => prev.map((u) => (u.id === userId ? updated.data : u)));
+  }
+
   async function deleteUser(userId: number) {
     if (!window.confirm("Deactivate this user? (Users are never hard-deleted)"))
       return;
@@ -548,6 +790,7 @@ function UsersTab() {
         password: newForm.password,
         role: newForm.role,
         member_number: newForm.member_number || null,
+        sub_role: newForm.sub_role || null,
       });
       setUsers((prev) => [...prev, created.data]);
       setShowAdd(false);
@@ -558,6 +801,7 @@ function UsersTab() {
         password: "",
         role: "member",
         member_number: "",
+        sub_role: "",
       });
     } catch (e: any) {
       setFormErr(e?.response?.data?.detail ?? "Failed to create user.");
@@ -577,16 +821,33 @@ function UsersTab() {
       <div
         style={{
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
+          alignItems: "center",
           gap: "8px",
           marginBottom: "1rem",
         }}
       >
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by name, email, role..."
+        />
         <button className="btn-primary" onClick={() => setShowAdd(!showAdd)}>
           <Plus size={14} /> Add User
         </button>
       </div>
-
+      {q && (
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--zinc-400)",
+            marginBottom: "0.75rem",
+          }}
+        >
+          {filtered.length} result{filtered.length !== 1 ? "s" : ""} for &ldquo;
+          {search}&rdquo;
+        </p>
+      )}
       {resettingUser && (
         <PasswordResetModal
           userId={resettingUser.id}
@@ -594,7 +855,6 @@ function UsersTab() {
           onClose={() => setResettingUser(null)}
         />
       )}
-
       {showAdd && (
         <div className="panel" style={{ marginBottom: "1.5rem" }}>
           <div
@@ -681,6 +941,21 @@ function UsersTab() {
                   placeholder="Optional"
                 />
               </label>
+              <label>
+                <span>Sub Role</span>
+                <select
+                  value={newForm.sub_role}
+                  onChange={(e) =>
+                    setNewForm({ ...newForm, sub_role: e.target.value })
+                  }
+                >
+                  {SUB_ROLE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             {formErr && <p className="error-text">{formErr}</p>}
             <button
@@ -693,21 +968,70 @@ function UsersTab() {
           </div>
         </div>
       )}
-
       <TableShell loading={loading} error={error}>
         <thead>
           <tr>
-            <Th>ID</Th>
-            <Th>Name</Th>
-            <Th>Email</Th>
-            <Th>Role</Th>
-            <Th>Member #</Th>
-            <Th>Active</Th>
+            <SortableTh
+              sortKey="id"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              ID
+            </SortableTh>
+            <SortableTh
+              sortKey="first_name"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Name
+            </SortableTh>
+            <SortableTh
+              sortKey="email"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Email
+            </SortableTh>
+            <SortableTh
+              sortKey="role"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Role
+            </SortableTh>
+            <SortableTh
+              sortKey="sub_role"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Sub Role
+            </SortableTh>
+            <SortableTh
+              sortKey="member_number"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Member #
+            </SortableTh>
+            <SortableTh
+              sortKey="is_active"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Active
+            </SortableTh>
             <Th>Actions</Th>
           </tr>
         </thead>
         <tbody>
-          {users.map((u) => (
+          {filtered.map((u) => (
             <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.5 }}>
               <Td mono>{u.id}</Td>
               <Td>
@@ -754,6 +1078,25 @@ function UsersTab() {
                   }
                 />
               </Td>
+              <Td>
+                <select
+                  value={u.sub_role ?? ""}
+                  onChange={(e) => saveSubRole(u.id, e.target.value)}
+                  style={{
+                    padding: "3px 8px",
+                    border: "1px solid var(--zinc-200)",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {SUB_ROLE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </Td>
               <Td mono>{u.member_number ?? "—"}</Td>
               <Td>
                 <Badge
@@ -783,13 +1126,26 @@ function UsersTab() {
               </Td>
             </tr>
           ))}
+          {filtered.length === 0 && !loading && (
+            <tr>
+              <td
+                colSpan={8}
+                style={{
+                  padding: "2rem",
+                  textAlign: "center",
+                  fontSize: "13px",
+                  color: "var(--zinc-400)",
+                }}
+              >
+                No users match &ldquo;{search}&rdquo;
+              </td>
+            </tr>
+          )}
         </tbody>
       </TableShell>
     </div>
   );
 }
-
-// ─── MEMBERS TAB ──────────────────────────────────────────────────────────────
 
 const RELATION_OPTIONS = ["PRIMARY", "SPOUSE", "CHILD", "OTHER"];
 const DIETARY_FLAGS = [
@@ -800,6 +1156,7 @@ const DIETARY_FLAGS = [
   "HALAL",
   "KOSHER",
   "NUT_ALLERGY",
+  "OTHER",
   "PEANUT_ALLERGY",
   "SESAME_ALLERGY",
   "SHELLFISH_ALLERGY",
@@ -816,6 +1173,7 @@ function MembersTab() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [showAdd, setShowAdd] = useState(false);
+  const [search, setSearch] = useState("");
   const [newForm, setNewForm] = useState({
     user_id: "",
     first_name: "",
@@ -825,6 +1183,25 @@ function MembersTab() {
   });
   const [saving, setSaving] = useState(false);
   const [formErr, setFormErr] = useState("");
+
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(members, "id");
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? sorted.filter((m) => {
+        const accountUser = users.find((u) => u.id === m.user_id);
+        const accountName = accountUser
+          ? `${accountUser.first_name} ${accountUser.last_name}`
+          : "";
+        return (
+          `${m.first_name} ${m.last_name}`.toLowerCase().includes(q) ||
+          accountName.toLowerCase().includes(q) ||
+          (m.relation ?? "").toLowerCase().includes(q) ||
+          (m.dietary_flags ?? []).join(" ").toLowerCase().includes(q) ||
+          (m.dietary_other_note ?? "").toLowerCase().includes(q) ||
+          String(m.id).includes(q)
+        );
+      })
+    : sorted;
 
   useEffect(() => {
     Promise.all([usersApi.get("/users/members/all"), usersApi.get("/users")])
@@ -914,14 +1291,32 @@ function MembersTab() {
       <div
         style={{
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: "1rem",
         }}
       >
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by name, account, relation..."
+        />
         <button className="btn-primary" onClick={() => setShowAdd(!showAdd)}>
           <UserPlus size={14} /> Add Member
         </button>
       </div>
+      {q && (
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--zinc-400)",
+            marginBottom: "0.75rem",
+          }}
+        >
+          {filtered.length} result{filtered.length !== 1 ? "s" : ""} for &ldquo;
+          {search}&rdquo;
+        </p>
+      )}
       {showAdd && (
         <div className="panel" style={{ marginBottom: "1.5rem" }}>
           <div
@@ -1046,17 +1441,52 @@ function MembersTab() {
       <TableShell loading={loading} error={error}>
         <thead>
           <tr>
-            <Th>ID</Th>
-            <Th>Name</Th>
-            <Th>Account</Th>
-            <Th>Relation</Th>
+            <SortableTh
+              sortKey="id"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              ID
+            </SortableTh>
+            <SortableTh
+              sortKey="first_name"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Name
+            </SortableTh>
+            <SortableTh
+              sortKey="user_id"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Account
+            </SortableTh>
+            <SortableTh
+              sortKey="relation"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Relation
+            </SortableTh>
             <Th>Dietary</Th>
-            <Th>Active</Th>
+            <SortableTh
+              sortKey="is_active"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Active
+            </SortableTh>
             <Th>Actions</Th>
           </tr>
         </thead>
         <tbody>
-          {members.map((m) => {
+          {filtered.map((m) => {
             const accountUser = users.find((u) => u.id === m.user_id);
             return (
               <tr key={m.id} style={{ opacity: m.is_active ? 1 : 0.5 }}>
@@ -1124,6 +1554,69 @@ function MembersTab() {
                           </option>
                         ))}
                       </select>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "4px",
+                          marginTop: "4px",
+                        }}
+                      >
+                        {DIETARY_FLAGS.map((flag) => {
+                          const active = (
+                            editForm.dietary_flags ?? []
+                          ).includes(flag);
+                          return (
+                            <button
+                              key={flag}
+                              type="button"
+                              onClick={() =>
+                                setEditForm((f: any) => ({
+                                  ...f,
+                                  dietary_flags: active
+                                    ? f.dietary_flags.filter(
+                                        (x: string) => x !== flag,
+                                      )
+                                    : [...(f.dietary_flags ?? []), flag],
+                                }))
+                              }
+                              style={{
+                                padding: "1px 7px",
+                                borderRadius: "20px",
+                                fontSize: "10px",
+                                cursor: "pointer",
+                                border: `1px solid ${active ? "var(--zinc-900)" : "var(--zinc-200)"}`,
+                                background: active
+                                  ? "var(--zinc-900)"
+                                  : "var(--bg-surface)",
+                                color: active ? "white" : "var(--zinc-600)",
+                              }}
+                            >
+                              {flag.replace(/_/g, " ")}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <textarea
+                        rows={2}
+                        placeholder="Other dietary notes..."
+                        value={editForm.dietary_other_note ?? ""}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            dietary_other_note: e.target.value,
+                          })
+                        }
+                        style={{
+                          marginTop: "4px",
+                          padding: "4px 8px",
+                          border: "1px solid var(--zinc-300)",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                          width: "100%",
+                          resize: "vertical",
+                        }}
+                      />
                     </div>
                   ) : (
                     <span>
@@ -1142,11 +1635,32 @@ function MembersTab() {
                   {editingId === m.id ? null : <Badge label={m.relation} />}
                 </Td>
                 <Td>
-                  <span style={{ fontSize: "11px", color: "var(--zinc-500)" }}>
-                    {m.dietary_flags?.length > 0
-                      ? m.dietary_flags.join(", ").replace(/_/g, " ")
-                      : "—"}
-                  </span>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "2px",
+                    }}
+                  >
+                    <span
+                      style={{ fontSize: "11px", color: "var(--zinc-500)" }}
+                    >
+                      {m.dietary_flags?.length > 0
+                        ? m.dietary_flags.join(", ").replace(/_/g, " ")
+                        : "—"}
+                    </span>
+                    {m.dietary_other_note && (
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--zinc-400)",
+                          fontStyle: "italic",
+                        }}
+                      >
+                        {m.dietary_other_note}
+                      </span>
+                    )}
+                  </div>
                 </Td>
                 <Td>
                   <Badge
@@ -1175,6 +1689,8 @@ function MembersTab() {
                             first_name: m.first_name,
                             last_name: m.last_name,
                             relation: m.relation,
+                            dietary_flags: m.dietary_flags ?? [],
+                            dietary_other_note: m.dietary_other_note ?? "",
                           });
                         }}
                         icon={<Edit2 size={14} />}
@@ -1196,13 +1712,26 @@ function MembersTab() {
               </tr>
             );
           })}
+          {filtered.length === 0 && !loading && (
+            <tr>
+              <td
+                colSpan={7}
+                style={{
+                  padding: "2rem",
+                  textAlign: "center",
+                  fontSize: "13px",
+                  color: "var(--zinc-400)",
+                }}
+              >
+                No members match &ldquo;{search}&rdquo;
+              </td>
+            </tr>
+          )}
         </tbody>
       </TableShell>
     </div>
   );
 }
-
-// ─── MENU TAB ─────────────────────────────────────────────────────────────────
 
 function MenuTab() {
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -1219,6 +1748,8 @@ function MenuTab() {
     dietary_flags: [],
     sort_order: 0,
   });
+
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(items, "id");
 
   useEffect(() => {
     getMenuItems()
@@ -1413,17 +1944,52 @@ function MenuTab() {
       <TableShell loading={loading} error={error}>
         <thead>
           <tr>
-            <Th>ID</Th>
-            <Th>Name</Th>
-            <Th>Category</Th>
-            <Th>Price</Th>
+            <SortableTh
+              sortKey="id"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              ID
+            </SortableTh>
+            <SortableTh
+              sortKey="name"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Name
+            </SortableTh>
+            <SortableTh
+              sortKey="category"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Category
+            </SortableTh>
+            <SortableTh
+              sortKey="price"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Price
+            </SortableTh>
             <Th>Type</Th>
-            <Th>Active</Th>
+            <SortableTh
+              sortKey="is_active"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Active
+            </SortableTh>
             <Th>Actions</Th>
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => (
+          {sorted.map((item) => (
             <tr
               key={item.id}
               style={{
@@ -1542,8 +2108,6 @@ function MenuTab() {
   );
 }
 
-// ─── ROOMS TAB ────────────────────────────────────────────────────────────────
-
 function RoomsTab() {
   const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1557,6 +2121,8 @@ function RoomsTab() {
     one_booking_max: false,
     dines_only: true,
   });
+
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(rooms, "id");
 
   useEffect(() => {
     roomsApi
@@ -1700,17 +2266,59 @@ function RoomsTab() {
       <TableShell loading={loading} error={error}>
         <thead>
           <tr>
-            <Th>ID</Th>
-            <Th>Name</Th>
-            <Th>Capacity</Th>
-            <Th>One Booking Max</Th>
-            <Th>Dines Only</Th>
-            <Th>Active</Th>
+            <SortableTh
+              sortKey="id"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              ID
+            </SortableTh>
+            <SortableTh
+              sortKey="name"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Name
+            </SortableTh>
+            <SortableTh
+              sortKey="capacity"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Capacity
+            </SortableTh>
+            <SortableTh
+              sortKey="one_booking_max"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              One Booking Max
+            </SortableTh>
+            <SortableTh
+              sortKey="dines_only"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Dines Only
+            </SortableTh>
+            <SortableTh
+              sortKey="is_active"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Active
+            </SortableTh>
             <Th>Actions</Th>
           </tr>
         </thead>
         <tbody>
-          {rooms.map((room) => (
+          {sorted.map((room) => (
             <tr key={room.id} style={{ opacity: room.is_active ? 1 : 0.5 }}>
               <Td mono>{room.id}</Td>
               <Td>
@@ -1809,22 +2417,31 @@ function RoomsTab() {
   );
 }
 
-// ─── BOOKINGS TAB ─────────────────────────────────────────────────────────────
-
 function BookingsTab({ onStatusChange }: { onStatusChange: () => void }) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [attendeeMap, setAttendeeMap] = useState<Record<number, Attendee[]>>(
     {},
   );
+  const [roomMap, setRoomMap] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(
+    bookings,
+    "id",
+    "desc",
+  );
+
   useEffect(() => {
-    bookingsApi
-      .get("/bookings")
-      .then(async (r) => {
-        const data = r.data;
+    Promise.all([bookingsApi.get("/bookings"), roomsApi.get("/rooms")])
+      .then(async ([bRes, rRes]) => {
+        const data = bRes.data;
         setBookings(data);
+        const rMap: Record<number, string> = {};
+        for (const r of rRes.data) {
+          rMap[r.id] = r.name;
+        }
+        setRoomMap(rMap);
         const entries = await Promise.all(
           data.map(async (b: any) => {
             try {
@@ -1842,9 +2459,17 @@ function BookingsTab({ onStatusChange }: { onStatusChange: () => void }) {
   }, []);
 
   async function forceStatus(id: number, status: string) {
-    const updated = await bookingsApi.patch(`/bookings/${id}/status`, {
-      status,
-    });
+    const actionMap: Record<string, string> = {
+      CONFIRMED: "confirm",
+      DRAFT: "revert-to-draft",
+      SEATED: "seat",
+      SERVICE: "start-service",
+      COMPLETED: "complete",
+      CANCELLED: "cancel",
+    };
+    const action = actionMap[status];
+    if (!action) return;
+    const updated = await bookingsApi.post(`/bookings/${id}/actions/${action}`);
     setBookings((prev) => prev.map((b) => (b.id === id ? updated.data : b)));
     onStatusChange();
   }
@@ -1862,19 +2487,62 @@ function BookingsTab({ onStatusChange }: { onStatusChange: () => void }) {
     <TableShell loading={loading} error={error}>
       <thead>
         <tr>
-          <Th>ID</Th>
-          <Th>Date</Th>
-          <Th>Meal</Th>
-          <Th>Room</Th>
-          <Th>Party</Th>
+          <SortableTh
+            sortKey="id"
+            activeSortKey={String(sortKey)}
+            sortDir={sortDir}
+            onSort={handleSort}
+          >
+            ID
+          </SortableTh>
+          <Th>Account</Th>
+          <SortableTh
+            sortKey="booking_date"
+            activeSortKey={String(sortKey)}
+            sortDir={sortDir}
+            onSort={handleSort}
+          >
+            Date
+          </SortableTh>
+          <SortableTh
+            sortKey="meal_type"
+            activeSortKey={String(sortKey)}
+            sortDir={sortDir}
+            onSort={handleSort}
+          >
+            Meal
+          </SortableTh>
+          <SortableTh
+            sortKey="room_id"
+            activeSortKey={String(sortKey)}
+            sortDir={sortDir}
+            onSort={handleSort}
+          >
+            Room
+          </SortableTh>
+          <SortableTh
+            sortKey="party_size"
+            activeSortKey={String(sortKey)}
+            sortDir={sortDir}
+            onSort={handleSort}
+          >
+            Party
+          </SortableTh>
           <Th>Members</Th>
           <Th>Guests</Th>
-          <Th>Status</Th>
+          <SortableTh
+            sortKey="status"
+            activeSortKey={String(sortKey)}
+            sortDir={sortDir}
+            onSort={handleSort}
+          >
+            Status
+          </SortableTh>
           <Th>Force Status</Th>
         </tr>
       </thead>
       <tbody>
-        {bookings.map((b) => {
+        {sorted.map((b) => {
           const sc = STATUS_COLORS[b.status] ?? { bg: "#eee", color: "#333" };
           const attendees = attendeeMap[b.id] ?? [];
           const memberCount = attendees.filter(
@@ -1883,12 +2551,29 @@ function BookingsTab({ onStatusChange }: { onStatusChange: () => void }) {
           const guestCount = attendees.filter(
             (a) => a.is_member_guest || a.linked_member_id === null,
           ).length;
+          const primary =
+            attendees.find((a) => a.linked_member_id && !a.is_member_guest) ??
+            attendees[0];
+          const accountName = primary
+            ? `${primary.guest_first_name ?? ""} ${primary.guest_last_name ?? ""}`.trim() ||
+              "—"
+            : "—";
+
           return (
             <tr key={b.id}>
               <Td mono>#{b.id}</Td>
+              <Td>
+                <span style={{ fontSize: "12px", color: "var(--zinc-700)" }}>
+                  {accountName}
+                </span>
+              </Td>
               <Td>{b.booking_date}</Td>
               <Td>{b.meal_type}</Td>
-              <Td mono>{b.room_id}</Td>
+              <Td>
+                <span style={{ fontSize: "12px" }}>
+                  {roomMap[b.room_id] ?? `Room ${b.room_id}`}
+                </span>
+              </Td>
               <Td>
                 <span style={{ fontWeight: 600 }}>{b.party_size}</span>
               </Td>
@@ -2106,7 +2791,6 @@ function MealWindowsTab() {
                 />
               )}
             </div>
-
             <div
               style={{
                 display: "grid",
@@ -2161,7 +2845,6 @@ function MealWindowsTab() {
                 ),
               )}
             </div>
-
             <div>
               <span
                 style={{
@@ -2212,12 +2895,10 @@ function MealWindowsTab() {
     </div>
   );
 }
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>("users");
   const [refreshKey, setRefreshKey] = useState(0);
-
   const triggerRefresh = () => setRefreshKey((k) => k + 1);
 
   return (
@@ -2225,9 +2906,7 @@ export function AdminPage() {
       <div className="page-header">
         <h2 className="page-title">Admin</h2>
       </div>
-
       <NeedsAttention refreshKey={refreshKey} />
-
       <div
         style={{
           display: "flex",
@@ -2263,7 +2942,6 @@ export function AdminPage() {
           </button>
         ))}
       </div>
-
       <p
         style={{
           fontSize: "13px",
@@ -2273,7 +2951,6 @@ export function AdminPage() {
       >
         {TAB_DESCRIPTIONS[activeTab]}
       </p>
-
       {activeTab === "users" && <UsersTab />}
       {activeTab === "members" && <MembersTab />}
       {activeTab === "menu" && <MenuTab />}

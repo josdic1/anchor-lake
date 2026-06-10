@@ -34,6 +34,7 @@ const DESKTOP_STEPS: TourStep[] = [
     content:
       "This is your command center. View reservations, filter by date or status, and open any booking to manage it in detail.",
     placement: "bottom",
+    roles: ["member", "admin"],
     actionHint:
       "Use the top filters like Today, Active, Drafts, and Past to jump straight to what matters.",
   },
@@ -43,6 +44,7 @@ const DESKTOP_STEPS: TourStep[] = [
     content:
       "Create a reservation here. Pick a date, time, room, and party. You can confirm immediately or save as a draft and finish later.",
     placement: "bottom",
+    roles: ["member", "admin"],
     actionHint: `"Confirm Booking" secures the reservation now. "Save Draft" lets you come back to it.`,
   },
   {
@@ -61,22 +63,32 @@ const DESKTOP_STEPS: TourStep[] = [
     placement: "bottom",
   },
   {
+    target: "#nav-today",
+    title: "Today's Sheet",
+    content:
+      "Your daily run sheet — bookings in arrival order, room status, dietary flags, and pre-orders. It refreshes automatically every minute.",
+    placement: "bottom",
+    roles: ["staff", "admin"],
+    actionHint:
+      "Wait staff see a Floor shortcut at the top. Kitchen staff see covers, pre-orders, and dietary flags first.",
+  },
+  {
     target: "#nav-dashboard",
     title: "Dashboard",
     content:
       "A quick operational view of the day — confirmed bookings, seated parties, active service, and anything needing attention.",
     placement: "bottom",
-    roles: ["staff", "admin"],
+    roles: ["admin"],
   },
   {
-    target: "#nav-seating",
-    title: "Seating Floor",
+    target: "#nav-floor",
+    title: "Floor View",
     content:
-      "This is the live floor view. Each table reflects its current status and party size. Open a table to see booking details or take an order.",
+      "The live floor — every active booking shown as a tile with status, party size, and order indicators. Open a tile to take action or add an order.",
     placement: "bottom",
     roles: ["staff", "admin"],
     actionHint:
-      "Once a party is seated, open the table and use Add to Order to begin service.",
+      "Once a party is seated, open the tile and use Add Order to begin service.",
   },
   {
     target: "#nav-service",
@@ -102,7 +114,7 @@ const DESKTOP_STEPS: TourStep[] = [
     content:
       "Generate daily schedules, booking summaries, and kitchen-facing reports for operations and planning.",
     placement: "bottom",
-    roles: ["staff", "admin"],
+    roles: ["admin"],
   },
   {
     target: "#nav-menu",
@@ -140,7 +152,7 @@ const DESKTOP_STEPS: TourStep[] = [
     target: "#tour-help-btn",
     title: "Need Help Later?",
     content:
-      "You can reopen this tour anytime using the help button. It’s always available if you need a quick refresher.",
+      "You can reopen this tour anytime using the help button. It's always available if you need a quick refresher.",
     placement: "left",
   },
 ];
@@ -150,7 +162,7 @@ const MOBILE_STEPS: TourStep[] = [
     target: "body",
     title: "Welcome",
     content:
-      "Welcome to your club’s mobile portal. This short walkthrough shows you how to book, manage your household, and keep track of reservations.",
+      "Welcome to your club's mobile portal. This short walkthrough shows you how to book, manage your household, and keep track of reservations.",
     placement: "center",
   },
   {
@@ -162,9 +174,9 @@ const MOBILE_STEPS: TourStep[] = [
   },
   {
     target: "body",
-    title: "You’re Ready",
+    title: "You're Ready",
     content:
-      "That’s everything. You can reopen this walkthrough anytime from the help button.",
+      "That's everything. You can reopen this walkthrough anytime from the help button.",
     placement: "center",
   },
 ];
@@ -577,7 +589,7 @@ function TourTooltip({
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
 const TOUR_KEY = "pt_tour_seen";
-const TOUR_VER = "3";
+const TOUR_VER = "4";
 
 export function hasTourCompleted(): boolean {
   return localStorage.getItem(TOUR_KEY) === TOUR_VER;
@@ -706,7 +718,7 @@ export function TutorialTour({
 
   return (
     <>
-      <SpotlightOverlay rect={rect} onClick={() => {}} />
+      <SpotlightOverlay rect={rect} onClick={next} />
       <div
         ref={wrapRef}
         style={{

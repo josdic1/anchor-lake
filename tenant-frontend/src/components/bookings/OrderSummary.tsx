@@ -3,6 +3,7 @@ import { Trash2, Plus, Minus } from "lucide-react";
 import type { Order, OrderItem } from "../../api/orders";
 import { getOrderItems, removeOrderItem, addOrderItem } from "../../api/orders";
 import { getMenuItems } from "../../api/menu";
+import { useRole } from "../../hooks/useRole";
 
 interface Props {
   orders: Order[];
@@ -20,7 +21,7 @@ export function OrderSummary({ orders, editable = false, onChanged }: Props) {
   const [itemsMap, setItemsMap] = useState<Record<number, OrderItem[]>>({});
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-
+  const { isStaffOrAdmin } = useRole();
   const orderIds = orders.map((o) => o.id).join(",");
 
   const load = useCallback(async () => {
@@ -280,16 +281,18 @@ export function OrderSummary({ orders, editable = false, onChanged }: Props) {
                   )}
 
                   {/* Price */}
-                  <span
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      minWidth: "48px",
-                      textAlign: "right",
-                    }}
-                  >
-                    ${(item.unit_price * item.quantity).toFixed(2)}
-                  </span>
+                  {isStaffOrAdmin && (
+                    <span
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        minWidth: "48px",
+                        textAlign: "right",
+                      }}
+                    >
+                      ${(item.unit_price * item.quantity).toFixed(2)}
+                    </span>
+                  )}
 
                   {/* Delete button — only when editable */}
                   {editable && (
@@ -329,7 +332,7 @@ export function OrderSummary({ orders, editable = false, onChanged }: Props) {
             }}
           >
             <span>Subtotal</span>
-            <span>${subtotal.toFixed(2)}</span>
+            {isStaffOrAdmin && <span>${subtotal.toFixed(2)}</span>}
           </div>
           <div
             style={{

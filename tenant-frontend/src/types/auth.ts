@@ -11,6 +11,7 @@ export type LoginResponse = {
   token_type: "bearer";
   user_id: number;
   role: UserRole;
+  sub_role?: string | null;
   force_password_change: boolean;
 };
 
@@ -18,4 +19,5 @@ export type AuthUser = {
   token: string;
   userId: number;
   role: UserRole;
+  sub_role?: string | null;
 };

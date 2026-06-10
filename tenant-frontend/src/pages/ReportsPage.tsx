@@ -14,14 +14,22 @@ import { getMenuItems } from "../api/menu";
 import { roomsApi } from "../api/client";
 import { useRole } from "../hooks/useRole";
 import { useTenant } from "../hooks/useTenant";
-import type { Booking, Attendee, Room, MenuItem } from "../types/booking";
+import type { Booking, Attendee, Room } from "../types/booking";
+import type { MenuItem } from "../api/menu";
 import type { Order, OrderItem } from "../api/orders";
 import Papa from "papaparse";
 import jsPDF from "jspdf";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ReportTab = "daily" | "kitchen" | "eod" | "covers" | "dietary" | "custom";
+type ReportTab =
+  | "daily"
+  | "kitchen"
+  | "eod"
+  | "covers"
+  | "attendance"
+  | "dietary"
+  | "custom";
 
 interface EnrichedBooking {
   booking: Booking;
@@ -54,14 +62,12 @@ function pdfHeader(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.text(title, 20, 30);
-
   if (subtitle) {
     doc.setFontSize(9);
     doc.setTextColor(120, 120, 120);
     doc.text(subtitle, 20, 38);
     doc.setTextColor(0, 0, 0);
   }
-
   doc.setDrawColor(200, 200, 200);
   doc.line(20, subtitle ? 43 : 35, 190, subtitle ? 43 : 35);
   return subtitle ? 50 : 42;
@@ -152,6 +158,32 @@ function getGuestNames(attendees: Attendee[]): string {
     .join("; ");
 }
 
+function getDietaryStr(attendees: Attendee[]): string {
+  const dietary = [...new Set(attendees.flatMap((a) => a.dietary_flags))];
+  const otherNotes = attendees
+    .filter((a) => a.dietary_flags.includes("OTHER") && a.dietary_other_note)
+    .map((a) => a.dietary_other_note!)
+    .join(", ");
+  return dietary
+    .map((f) =>
+      f === "OTHER" && otherNotes ? otherNotes : f.replace(/_/g, " "),
+    )
+    .join("; ");
+}
+
+function getItemsOrdered(
+  e: EnrichedBooking,
+  menuMap: Record<number, string>,
+): string {
+  return e.orders
+    .flatMap((o) => e.orderItems[o.id] ?? [])
+    .map(
+      (i) =>
+        `${i.quantity}x ${menuMap[i.menu_item_id] ?? `Item #${i.menu_item_id}`}`,
+    )
+    .join("; ");
+}
+
 // ─── Report Generators ────────────────────────────────────────────────────────
 
 function generateDailyRunSheet(
@@ -199,18 +231,15 @@ function generateDailyRunSheet(
   bookings.forEach((e) => {
     y = checkPage(doc, y);
     const b = e.booking;
-    const memberName = getMemberName(e.attendees);
-    const room = e.room?.name ?? `Room ${b.room_id}`;
     const dietary = [...new Set(e.attendees.flatMap((a) => a.dietary_flags))];
-
     doc.setFontSize(9);
     y = pdfRow(
       doc,
       y,
       [
         b.estimated_arrival.slice(0, 5),
-        memberName.slice(0, 18),
-        room.slice(0, 16),
+        getMemberName(e.attendees).slice(0, 18),
+        (e.room?.name ?? `Room ${b.room_id}`).slice(0, 16),
         String(b.party_size),
         MEAL_LABELS[b.meal_type] ?? b.meal_type,
         b.status,
@@ -221,24 +250,27 @@ function generateDailyRunSheet(
     if (b.notes || dietary.length > 0) {
       doc.setFontSize(7.5);
       doc.setTextColor(100, 100, 100);
-
       if (b.notes) {
         doc.text(`  Notes: ${b.notes}`, 20, y);
         y += 5;
       }
-
       if (dietary.length) {
-        doc.text(
-          `  Dietary: ${dietary.map((f) => f.replace(/_/g, " ")).join(", ")}`,
-          20,
-          y,
-        );
+        const otherNotes = e.attendees
+          .filter(
+            (a) => a.dietary_flags.includes("OTHER") && a.dietary_other_note,
+          )
+          .map((a) => a.dietary_other_note!)
+          .join(", ");
+        const dietaryLabel = dietary
+          .map((f) =>
+            f === "OTHER" && otherNotes ? otherNotes : f.replace(/_/g, " "),
+          )
+          .join(", ");
+        doc.text(`  Dietary: ${dietaryLabel}`, 20, y);
         y += 5;
       }
-
       doc.setTextColor(0, 0, 0);
     }
-
     doc.setDrawColor(235, 235, 235);
     doc.line(20, y - 2, 190, y - 2);
   });
@@ -253,7 +285,6 @@ function generateDailyRunSheet(
     20,
     y,
   );
-
   downloadPDF(doc, `daily-run-sheet-${date}.pdf`);
 }
 
@@ -311,14 +342,21 @@ function generateKitchenChits(
 
       const dietary = [...new Set(e.attendees.flatMap((a) => a.dietary_flags))];
       if (dietary.length > 0) {
+        const otherNotes = e.attendees
+          .filter(
+            (a) => a.dietary_flags.includes("OTHER") && a.dietary_other_note,
+          )
+          .map((a) => a.dietary_other_note!)
+          .join(", ");
+        const dietaryLabel = dietary
+          .map((f) =>
+            f === "OTHER" && otherNotes ? otherNotes : f.replace(/_/g, " "),
+          )
+          .join(" · ");
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
         doc.setTextColor(180, 60, 0);
-        doc.text(
-          `⚠ DIETARY: ${dietary.map((f) => f.replace(/_/g, " ")).join(" · ")}`,
-          15,
-          y,
-        );
+        doc.text(`⚠ DIETARY: ${dietaryLabel}`, 15, y);
         doc.setTextColor(0, 0, 0);
         doc.setFont("helvetica", "normal");
         y += 8;
@@ -340,19 +378,16 @@ function generateKitchenChits(
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         y += 6;
-
         (item.modifier_ids ?? []).forEach((mid) => {
           doc.text(`      → ${menuMap[mid] ?? `Mod #${mid}`}`, 15, y);
           y += 5;
         });
-
         if (item.special_instructions) {
           doc.setTextColor(100, 100, 100);
           doc.text(`      * ${item.special_instructions}`, 15, y);
           doc.setTextColor(0, 0, 0);
           y += 5;
         }
-
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
       });
@@ -402,7 +437,6 @@ function generateEndOfDay(
           menuMap[item.menu_item_id] ?? `Item #${item.menu_item_id}`;
         const subtotal = item.quantity * item.unit_price;
         totalRevenue += subtotal;
-
         const existing = allItems.find((i) => i.name === itemName);
         if (existing) existing.qty += item.quantity;
         else
@@ -444,7 +478,6 @@ function generateEndOfDay(
   });
 
   y += 38;
-
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.text("Items Sold", 20, y);
@@ -483,7 +516,6 @@ function generateEndOfDay(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.text(`Total Revenue: $${totalRevenue.toFixed(2)}`, 20, y);
-
   y += 12;
   y = checkPage(doc, y);
   doc.setFont("helvetica", "bold");
@@ -517,6 +549,101 @@ function generateEndOfDay(
   }
 
   downloadPDF(doc, `end-of-day-${date}.pdf`);
+}
+
+function generateAttendanceReport(
+  enriched: EnrichedBooking[],
+  from: string,
+  to: string,
+  tenantName: string,
+) {
+  const doc = new jsPDF({ orientation: "landscape" });
+  let y = pdfHeader(
+    doc,
+    tenantName,
+    "Attendance Report",
+    `${from} to ${to} · Generated ${new Date().toLocaleTimeString()}`,
+  );
+
+  const rows = enriched
+    .filter(
+      (e) =>
+        e.booking.booking_date >= from &&
+        e.booking.booking_date <= to &&
+        e.booking.status !== "CANCELLED",
+    )
+    .sort(
+      (a, b) =>
+        a.booking.booking_date.localeCompare(b.booking.booking_date) ||
+        a.booking.estimated_arrival.localeCompare(b.booking.estimated_arrival),
+    );
+
+  if (rows.length === 0) {
+    doc.setFontSize(10);
+    doc.text("No bookings for this date range.", 20, y);
+    return downloadPDF(doc, `attendance-${from}-to-${to}.pdf`);
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setFillColor(245, 245, 245);
+  doc.rect(20, y - 5, 257, 8, "F");
+  const cols = [
+    "DATE",
+    "ARR",
+    "MEMBER",
+    "ROOM",
+    "PARTY",
+    "MEAL",
+    "STATUS",
+    "MEMBERS",
+    "GUESTS",
+    "DIETARY",
+    "NOTES",
+  ];
+  const widths = [20, 14, 35, 25, 12, 20, 18, 45, 35, 35, 40];
+  y = pdfRow(doc, y, cols, widths);
+  doc.setFont("helvetica", "normal");
+  doc.setDrawColor(200, 200, 200);
+  doc.line(20, y - 2, 277, y - 2);
+
+  rows.forEach((e) => {
+    y = checkPage(doc, y, 185);
+    const b = e.booking;
+    doc.setFontSize(7.5);
+    y = pdfRow(
+      doc,
+      y,
+      [
+        b.booking_date,
+        b.estimated_arrival.slice(0, 5),
+        getMemberName(e.attendees).slice(0, 20),
+        (e.room?.name ?? `Room ${b.room_id}`).slice(0, 14),
+        String(b.party_size),
+        (MEAL_LABELS[b.meal_type] ?? b.meal_type).slice(0, 10),
+        b.status,
+        getMemberNames(e.attendees).slice(0, 28),
+        getGuestNames(e.attendees).slice(0, 22),
+        getDietaryStr(e.attendees).slice(0, 22),
+        (b.notes ?? "").slice(0, 26),
+      ],
+      widths,
+    );
+    doc.setDrawColor(235, 235, 235);
+    doc.line(20, y - 2, 277, y - 2);
+  });
+
+  y = checkPage(doc, y + 5);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text(`Total Bookings: ${rows.length}`, 20, y);
+  y += 6;
+  doc.text(
+    `Total Covers: ${rows.reduce((acc, e) => acc + e.booking.party_size, 0)}`,
+    20,
+    y,
+  );
+  downloadPDF(doc, `attendance-${from}-to-${to}.pdf`);
 }
 
 // ─── CSV Exports ──────────────────────────────────────────────────────────────
@@ -592,7 +719,11 @@ function exportDietaryCSV(
               `${a.guest_first_name ?? ""} ${a.guest_last_name ?? ""}`.trim() ||
               `Member #${a.linked_member_id}`,
             dietary_flags: a.dietary_flags
-              .map((f) => f.replace(/_/g, " "))
+              .map((f) =>
+                f === "OTHER" && a.dietary_other_note
+                  ? a.dietary_other_note
+                  : f.replace(/_/g, " "),
+              )
               .join("; "),
           });
         });
@@ -600,6 +731,7 @@ function exportDietaryCSV(
   downloadCSV(`dietary-${from}-to-${to}.csv`, rows);
 }
 
+// unit_price and subtotal removed at client request — add back end of season
 function exportOrdersCSV(
   enriched: EnrichedBooking[],
   menuMap: Record<number, string>,
@@ -622,8 +754,6 @@ function exportOrdersCSV(
             room: e.room?.name ?? `Room ${e.booking.room_id}`,
             item: menuMap[item.menu_item_id] ?? `Item #${item.menu_item_id}`,
             quantity: item.quantity,
-            unit_price: item.unit_price.toFixed(2),
-            subtotal: (item.quantity * item.unit_price).toFixed(2),
             special_instructions: item.special_instructions ?? "",
             kitchen_status: order.kitchen_status,
             fired_at: order.fired_at ?? "",
@@ -634,28 +764,88 @@ function exportOrdersCSV(
   downloadCSV(`orders-${from}-to-${to}.csv`, rows);
 }
 
+function exportAttendanceCSV(
+  enriched: EnrichedBooking[],
+  menuMap: Record<number, string>,
+  from: string,
+  to: string,
+) {
+  const rows = enriched
+    .filter(
+      (e) =>
+        e.booking.booking_date >= from &&
+        e.booking.booking_date <= to &&
+        e.booking.status !== "CANCELLED",
+    )
+    .sort(
+      (a, b) =>
+        a.booking.booking_date.localeCompare(b.booking.booking_date) ||
+        a.booking.estimated_arrival.localeCompare(b.booking.estimated_arrival),
+    )
+    .map((e) => ({
+      "Booking ID": e.booking.id,
+      Date: e.booking.booking_date,
+      Arrival: e.booking.estimated_arrival.slice(0, 5),
+      Member: getMemberName(e.attendees),
+      Room: e.room?.name ?? `Room ${e.booking.room_id}`,
+      "Party Size": e.booking.party_size,
+      Meal: MEAL_LABELS[e.booking.meal_type] ?? e.booking.meal_type,
+      Status: e.booking.status,
+      Members: getMemberNames(e.attendees),
+      Guests: getGuestNames(e.attendees),
+      "Attendee Count": e.attendees.length,
+      "Member Count": e.attendees.filter(
+        (a) => a.linked_member_id !== null && !a.is_member_guest,
+      ).length,
+      "Guest Count": e.attendees.filter(
+        (a) => a.linked_member_id === null || a.is_member_guest,
+      ).length,
+      "Order Count": e.orders.length,
+      "Items Ordered": getItemsOrdered(e, menuMap),
+      "Dietary Flags": getDietaryStr(e.attendees),
+      Notes: e.booking.notes ?? "",
+    }));
+  downloadCSV(`attendance-${from}-to-${to}.csv`, rows);
+}
+
 // ─── Custom CSV Builder ───────────────────────────────────────────────────────
 
-const ALL_BOOKING_FIELDS: { key: string; label: string }[] = [
-  { key: "id", label: "Booking ID" },
-  { key: "member", label: "Member Name" },
-  { key: "booking_date", label: "Date" },
-  { key: "estimated_arrival", label: "Arrival" },
-  { key: "meal_type", label: "Meal" },
-  { key: "room", label: "Room" },
-  { key: "party_size", label: "Party Size" },
-  { key: "status", label: "Status" },
-  { key: "notes", label: "Notes" },
-  { key: "confirmed_at", label: "Confirmed At" },
-  { key: "seated_at", label: "Seated At" },
-  { key: "completed_at", label: "Completed At" },
-  { key: "dietary", label: "Dietary Flags" },
-  { key: "attendees", label: "Attendees" },
-  { key: "members_list", label: "Members" },
-  { key: "guests_list", label: "Guests" },
-  { key: "attendee_count", label: "Attendee Count" },
-  { key: "order_count", label: "Order Count" },
+const ALL_BOOKING_FIELDS: { key: string; label: string; group: string }[] = [
+  // Booking Core
+  { key: "id", label: "Booking ID", group: "Booking" },
+  { key: "booking_date", label: "Date", group: "Booking" },
+  { key: "estimated_arrival", label: "Arrival Time", group: "Booking" },
+  { key: "meal_type", label: "Meal", group: "Booking" },
+  { key: "room", label: "Room", group: "Booking" },
+  { key: "party_size", label: "Party Size", group: "Booking" },
+  { key: "status", label: "Status", group: "Booking" },
+  { key: "notes", label: "Booking Notes", group: "Booking" },
+  { key: "confirmed_at", label: "Confirmed At", group: "Booking" },
+  { key: "seated_at", label: "Seated At", group: "Booking" },
+  { key: "completed_at", label: "Completed At", group: "Booking" },
+  { key: "cancelled_at", label: "Cancelled At", group: "Booking" },
+  { key: "additional_charges", label: "Additional Charges", group: "Booking" },
+  {
+    key: "additional_charge_notes",
+    label: "Additional Charge Notes",
+    group: "Booking",
+  },
+  // People
+  { key: "member", label: "Primary Member", group: "People" },
+  { key: "members_list", label: "All Members", group: "People" },
+  { key: "guests_list", label: "Guests", group: "People" },
+  { key: "attendees", label: "All Attendees", group: "People" },
+  { key: "attendee_count", label: "Total Attendees", group: "People" },
+  { key: "members_count", label: "Member Count", group: "People" },
+  { key: "guests_count", label: "Guest Count", group: "People" },
+  // Dietary
+  { key: "dietary", label: "Dietary Flags", group: "Dietary" },
+  // Orders
+  { key: "order_count", label: "Order Count", group: "Orders" },
+  { key: "items_ordered", label: "Items Ordered", group: "Orders" },
 ];
+
+const FIELD_GROUPS = ["Booking", "People", "Dietary", "Orders"];
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -673,6 +863,7 @@ export function ReportsPage() {
       icon: FileText,
       adminOnly: true,
     },
+    { key: "attendance", label: "Attendance", icon: FileText, adminOnly: true },
     { key: "custom", label: "Custom Export", icon: Table, adminOnly: true },
   ].filter((tab) => !tab.adminOnly || isAdmin) as {
     key: ReportTab;
@@ -687,11 +878,9 @@ export function ReportsPage() {
   const [generating, setGenerating] = useState(false);
   const [enriched, setEnriched] = useState<EnrichedBooking[]>([]);
   const [menuMap, setMenuMap] = useState<Record<number, string>>({});
-
   const [reportDate, setReportDate] = useState(today);
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
-
   const [selectedFields, setSelectedFields] = useState<string[]>([
     "id",
     "member",
@@ -724,11 +913,9 @@ export function ReportsPage() {
               getAttendees(b.id),
               getOrdersByBooking(b.id),
             ]);
-
             const attendeeList =
               attendees.status === "fulfilled" ? attendees.value : [];
             const orderList = orders.status === "fulfilled" ? orders.value : [];
-
             const orderItemsMap: Record<number, OrderItem[]> = {};
             await Promise.all(
               orderList.map(async (o) => {
@@ -739,7 +926,6 @@ export function ReportsPage() {
                 }
               }),
             );
-
             return {
               booking: b,
               attendees: attendeeList,
@@ -749,7 +935,6 @@ export function ReportsPage() {
             };
           }),
         );
-
         setEnriched(enrichedData);
       } catch (err) {
         console.error("Reports load failed", err);
@@ -757,7 +942,6 @@ export function ReportsPage() {
         setLoading(false);
       }
     }
-
     loadAll();
   }, []);
 
@@ -785,7 +969,6 @@ export function ReportsPage() {
       )
       .map((e) => {
         const row: Record<string, unknown> = {};
-
         selectedFields.forEach((key) => {
           switch (key) {
             case "id":
@@ -814,7 +997,7 @@ export function ReportsPage() {
               row["Status"] = e.booking.status;
               break;
             case "notes":
-              row["Notes"] = e.booking.notes ?? "";
+              row["Booking Notes"] = e.booking.notes ?? "";
               break;
             case "confirmed_at":
               row["Confirmed At"] = e.booking.confirmed_at ?? "";
@@ -825,12 +1008,19 @@ export function ReportsPage() {
             case "completed_at":
               row["Completed At"] = e.booking.completed_at ?? "";
               break;
+            case "cancelled_at":
+              row["Cancelled At"] = (e.booking as any).cancelled_at ?? "";
+              break;
+            case "additional_charges":
+              row["Additional Charges"] =
+                (e.booking as any).additional_charges ?? "";
+              break;
+            case "additional_charge_notes":
+              row["Additional Charge Notes"] =
+                (e.booking as any).additional_charge_notes ?? "";
+              break;
             case "dietary":
-              row["Dietary Flags"] = [
-                ...new Set(e.attendees.flatMap((a) => a.dietary_flags)),
-              ]
-                .map((f) => f.replace(/_/g, " "))
-                .join("; ");
+              row["Dietary Flags"] = getDietaryStr(e.attendees);
               break;
             case "attendees":
               row["Attendees"] = getAttendeeNames(e.attendees);
@@ -842,17 +1032,28 @@ export function ReportsPage() {
               row["Guests"] = getGuestNames(e.attendees);
               break;
             case "attendee_count":
-              row["Attendee Count"] = e.attendees.length;
+              row["Total Attendees"] = e.attendees.length;
+              break;
+            case "members_count":
+              row["Member Count"] = e.attendees.filter(
+                (a) => a.linked_member_id !== null && !a.is_member_guest,
+              ).length;
+              break;
+            case "guests_count":
+              row["Guest Count"] = e.attendees.filter(
+                (a) => a.linked_member_id === null || a.is_member_guest,
+              ).length;
               break;
             case "order_count":
               row["Order Count"] = e.orders.length;
               break;
+            case "items_ordered":
+              row["Items Ordered"] = getItemsOrdered(e, menuMap);
+              break;
           }
         });
-
         return row;
       });
-
     downloadCSV(`custom-export-${dateFrom}-to-${dateTo}.csv`, rows);
   }
 
@@ -868,13 +1069,11 @@ export function ReportsPage() {
     border: "none",
     opacity: generating ? 0.6 : 1,
   };
-
   const pdfBtn: React.CSSProperties = {
     ...btnStyle,
     background: "var(--zinc-900)",
     color: "white",
   };
-
   const csvBtn: React.CSSProperties = {
     ...btnStyle,
     background: "var(--bg-surface)",
@@ -993,7 +1192,6 @@ export function ReportsPage() {
               <Printer size={14} /> Print PDF
             </button>
           </div>
-
           <div
             style={{
               border: "1px solid var(--zinc-200)",
@@ -1016,7 +1214,6 @@ export function ReportsPage() {
             >
               Preview — {reportDate}
             </div>
-
             {enriched.filter(
               (e) =>
                 e.booking.booking_date === reportDate &&
@@ -1199,7 +1396,6 @@ export function ReportsPage() {
               <Printer size={14} /> Print Chits
             </button>
           </div>
-
           <div
             style={{
               fontSize: "13px",
@@ -1263,7 +1459,6 @@ export function ReportsPage() {
               <Download size={14} /> Orders CSV
             </button>
           </div>
-
           {(() => {
             const day = enriched.filter(
               (e) =>
@@ -1283,7 +1478,6 @@ export function ReportsPage() {
                 ),
               )
               .reduce((a, b) => a + b, 0);
-
             return (
               <div
                 style={{
@@ -1357,7 +1551,6 @@ export function ReportsPage() {
             </label>
             {dateInput(dateTo, setDateTo)}
           </div>
-
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <button
               style={csvBtn}
@@ -1399,6 +1592,66 @@ export function ReportsPage() {
         </div>
       )}
 
+      {activeTab === "attendance" && (
+        <div>
+          {sectionTitle(
+            "Attendance Report",
+            "All bookings for a date range with members, guests, dietary flags, items ordered, and booking notes.",
+          )}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "1rem",
+              flexWrap: "wrap",
+              marginBottom: "1.5rem",
+            }}
+          >
+            <label style={{ fontSize: "13px", color: "var(--zinc-600)" }}>
+              From
+            </label>
+            {dateInput(dateFrom, setDateFrom)}
+            <label style={{ fontSize: "13px", color: "var(--zinc-600)" }}>
+              To
+            </label>
+            {dateInput(dateTo, setDateTo)}
+            <button
+              style={pdfBtn}
+              disabled={generating}
+              onClick={() =>
+                run(() =>
+                  generateAttendanceReport(enriched, dateFrom, dateTo, name),
+                )
+              }
+            >
+              <Printer size={14} /> Print PDF
+            </button>
+            <button
+              style={csvBtn}
+              disabled={generating}
+              onClick={() =>
+                run(() =>
+                  exportAttendanceCSV(enriched, menuMap, dateFrom, dateTo),
+                )
+              }
+            >
+              <Download size={14} /> CSV
+            </button>
+          </div>
+          <div style={{ fontSize: "13px", color: "var(--zinc-500)" }}>
+            {
+              enriched.filter(
+                (e) =>
+                  e.booking.booking_date >= dateFrom &&
+                  e.booking.booking_date <= dateTo &&
+                  e.booking.status !== "CANCELLED",
+              ).length
+            }{" "}
+            bookings in range
+          </div>
+        </div>
+      )}
+
       {activeTab === "custom" && (
         <div>
           {sectionTitle(
@@ -1423,54 +1676,57 @@ export function ReportsPage() {
             </label>
             {dateInput(dateTo, setDateTo)}
           </div>
-
           <div style={{ marginBottom: "1.5rem" }}>
-            <span
-              style={{
-                fontSize: "12px",
-                fontWeight: 600,
-                color: "var(--zinc-500)",
-                textTransform: "uppercase" as const,
-                letterSpacing: "0.06em",
-              }}
-            >
-              Select Fields
-            </span>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "8px",
-                marginTop: "0.75rem",
-              }}
-            >
-              {ALL_BOOKING_FIELDS.map((field) => {
-                const active = selectedFields.includes(field.key);
-                return (
-                  <button
-                    key={field.key}
-                    type="button"
-                    onClick={() => toggleField(field.key)}
+            {FIELD_GROUPS.map((group) => {
+              const groupFields = ALL_BOOKING_FIELDS.filter(
+                (f) => f.group === group,
+              );
+              return (
+                <div key={group} style={{ marginBottom: "1.25rem" }}>
+                  <div
                     style={{
-                      padding: "4px 12px",
-                      fontSize: "12px",
-                      borderRadius: "20px",
-                      cursor: "pointer",
-                      border: `1px solid ${active ? "var(--zinc-900)" : "var(--zinc-200)"}`,
-                      background: active
-                        ? "var(--zinc-900)"
-                        : "var(--bg-surface)",
-                      color: active ? "white" : "var(--zinc-600)",
-                      fontWeight: active ? 600 : 400,
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "var(--zinc-500)",
+                      textTransform: "uppercase" as const,
+                      letterSpacing: "0.06em",
+                      marginBottom: "0.5rem",
                     }}
                   >
-                    {field.label}
-                  </button>
-                );
-              })}
-            </div>
+                    {group}
+                  </div>
+                  <div
+                    style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
+                  >
+                    {groupFields.map((field) => {
+                      const active = selectedFields.includes(field.key);
+                      return (
+                        <button
+                          key={field.key}
+                          type="button"
+                          onClick={() => toggleField(field.key)}
+                          style={{
+                            padding: "4px 12px",
+                            fontSize: "12px",
+                            borderRadius: "20px",
+                            cursor: "pointer",
+                            border: `1px solid ${active ? "var(--zinc-900)" : "var(--zinc-200)"}`,
+                            background: active
+                              ? "var(--zinc-900)"
+                              : "var(--bg-surface)",
+                            color: active ? "white" : "var(--zinc-600)",
+                            fontWeight: active ? 600 : 400,
+                          }}
+                        >
+                          {field.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
           <div
             style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}
           >

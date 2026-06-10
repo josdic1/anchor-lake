@@ -43,6 +43,7 @@ export type Attendee = {
   guest_last_name: string | null;
   is_member_guest: boolean;
   dietary_flags: string[];
+  dietary_other_note?: string | null;
   notes: string | null;
 };
 
@@ -74,7 +75,8 @@ export type MenuCategory =
   | "SIDE"
   | "DESSERT"
   | "DRINK"
-  | "SPECIAL";
+  | "SPECIAL"
+  | "KIDS";
 
 export interface MenuItem {
   id: number;
@@ -125,6 +127,7 @@ export type GuestAttendeeInput = {
   linked_member_id?: number | null;
   is_member_guest?: boolean;
   dietary_flags?: string[];
+  dietary_other_note?: string | null;
   notes?: string | null;
 };
 

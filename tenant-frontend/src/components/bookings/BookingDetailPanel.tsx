@@ -126,6 +126,7 @@ function AttendeeEditor({
         first_name: guestForm.first_name.trim(),
         last_name: guestForm.last_name.trim(),
         dietary_flags: guestForm.dietary_flags,
+        dietary_other_note: "",
         is_member_guest: false,
         linked_member_id: null,
       });
