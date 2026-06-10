@@ -481,7 +481,7 @@ export function UpcomingPage() {
               getAttendees(b.id),
               getOrdersByBooking(b.id),
             ]);
-            console.log("attendees for", b.id, attendees);
+          
             return {
               booking: b,
               attendees,
