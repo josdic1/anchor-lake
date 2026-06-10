@@ -1,9 +1,14 @@
 interface TenantLoaderProps {
   manualExit?: () => void;
   isManual?: boolean;
+  message?: string;
 }
 
-export function TenantLoader({ manualExit, isManual }: TenantLoaderProps) {
+export function TenantLoader({
+  manualExit,
+  isManual,
+  message,
+}: TenantLoaderProps) {
   return (
     <div
       className="abeyton-loader-overlay"
@@ -21,6 +26,22 @@ export function TenantLoader({ manualExit, isManual }: TenantLoaderProps) {
           }}
         />
         <div className="loader-text">Anchor Lake</div>
+        {message && (
+          <div
+            style={{
+              fontSize: "13px",
+              color: "var(--zinc-400)",
+              fontFamily: "var(--font-body)",
+              textAlign: "center",
+              opacity: 0,
+              animation: "logoFadeIn 1.2s ease-out 1s forwards",
+              maxWidth: "260px",
+              lineHeight: 1.6,
+            }}
+          >
+            {message}
+          </div>
+        )}
         {isManual && (
           <span
             style={{

@@ -7,6 +7,7 @@ import { useAuth } from "../hooks/useAuth";
 import type { Booking, Attendee, Room } from "../types/booking";
 import type { Order, OrderItem } from "../api/orders";
 import type { MenuItem } from "../api/menu";
+import { DemoPanel } from "../components/shared/DemoPanel";
 
 interface EnrichedBooking {
   booking: Booking;
@@ -1114,6 +1115,7 @@ export function TodayPage() {
             }
           />
         </div>
+        <DemoPanel />
 
         {isKitchen && !isAdmin && (
           <>

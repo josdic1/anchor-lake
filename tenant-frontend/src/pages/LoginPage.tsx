@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useTenant } from "../hooks/useTenant";
 import { usersApi } from "../api/client";
+import { DemoPanel } from "../components/shared/DemoPanel";
 import type { LoginRequest } from "../types/auth";
-import { Sparkles, RotateCcw } from "lucide-react";
 
 type PageMode = "checking" | "setup" | "login";
 type SetupStep =
@@ -84,7 +84,7 @@ function DemoLoginPanel({
     { label: "Members", role: "member" },
   ];
 
-  if (loading) {
+  if (loading)
     return (
       <div
         style={{
@@ -97,7 +97,6 @@ function DemoLoginPanel({
         Loading accounts...
       </div>
     );
-  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -261,12 +260,7 @@ function SetupFlow({
     }
   }
 
-  async function handleQuickLogin(email: string) {
-    setLoggingIn(email);
-    onLogin(email);
-  }
-
-  if (step === "working") {
+  if (step === "working")
     return (
       <div
         style={{
@@ -291,9 +285,8 @@ function SetupFlow({
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
-  }
 
-  if (step === "choose") {
+  if (step === "choose")
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         <div style={{ marginBottom: "8px" }}>
@@ -348,7 +341,6 @@ function SetupFlow({
             >
               Start Fresh
             </span>
-            <span>🚀</span>
           </div>
           <div
             style={{
@@ -397,7 +389,6 @@ function SetupFlow({
             >
               Explore with Sample Data
             </span>
-            <span>🔬</span>
           </div>
           <div
             style={{
@@ -412,9 +403,8 @@ function SetupFlow({
         </button>
       </div>
     );
-  }
 
-  if (step === "fresh-confirm") {
+  if (step === "fresh-confirm")
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         <div>
@@ -535,9 +525,8 @@ function SetupFlow({
         </div>
       </div>
     );
-  }
 
-  if (step === "sample-confirm") {
+  if (step === "sample-confirm")
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         <div>
@@ -563,30 +552,21 @@ function SetupFlow({
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {[
-            { icon: "👥", text: "8 member households with dietary flags" },
-            { icon: "🍽️", text: "Full menu — starters, mains, sides, drinks" },
-            { icon: "📅", text: "60 days of bookings — past, active, today" },
-            {
-              icon: "🧾",
-              text: "Realistic orders with fired and served states",
-            },
-            {
-              icon: "🔑",
-              text: "Admin, staff, and member accounts — all pw 111111",
-            },
-          ].map(({ icon, text }) => (
+            { text: "8 member households with dietary flags" },
+            { text: "Full menu — starters, mains, sides, drinks" },
+            { text: "60 days of bookings — past, active, today" },
+            { text: "Realistic orders with fired and served states" },
+            { text: "Admin, staff, and member accounts — all pw 111111" },
+          ].map(({ text }) => (
             <div
               key={text}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
                 fontSize: "13px",
                 color: "var(--zinc-600)",
+                padding: "4px 0",
               }}
             >
-              <span>{icon}</span>
-              {text}
+              — {text}
             </div>
           ))}
         </div>
@@ -637,9 +617,8 @@ function SetupFlow({
         </div>
       </div>
     );
-  }
 
-  if (step === "sample-done") {
+  if (step === "sample-done")
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         <div>
@@ -738,13 +717,15 @@ function SetupFlow({
           </button>
         </div>
         <DemoLoginPanel
-          onLogin={handleQuickLogin}
+          onLogin={(email) => {
+            setLoggingIn(email);
+            onLogin(email);
+          }}
           loggingIn={loggingIn}
           open={true}
         />
       </div>
     );
-  }
 
   return null;
 }
@@ -757,8 +738,6 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [resetMsg, setResetMsg] = useState("");
 
   useEffect(() => {
     async function check() {
@@ -794,36 +773,7 @@ export function LoginPage() {
     }
   }
 
-  async function handleTryDemo() {
-    setLoading(true);
-    setError("");
-    try {
-      await usersApi.post("/demo/reset-sample");
-      await loginUser({
-        email: "admin@demo.com",
-        password: "111111",
-      } as LoginRequest);
-    } catch {
-      setError("Failed to load demo. Try again.");
-      setLoading(false);
-    }
-  }
-
-  async function handleResetApp() {
-    setResetting(true);
-    setResetMsg("");
-    setError("");
-    try {
-      await usersApi.post("/demo/reset-app");
-      setResetMsg("App reset. You can now log in as admin.");
-    } catch {
-      setError("Reset failed. Try again.");
-    } finally {
-      setResetting(false);
-    }
-  }
-
-  if (pageMode === "checking") {
+  if (pageMode === "checking")
     return (
       <div
         style={{
@@ -846,7 +796,6 @@ export function LoginPage() {
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
-  }
 
   return (
     <div
@@ -908,76 +857,16 @@ export function LoginPage() {
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-              <button
-                type="button"
-                onClick={handleTryDemo}
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  padding: "13px",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  borderRadius: "var(--radius-sm)",
-                  border: "none",
-                  background: "var(--zinc-900)",
-                  color: "white",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  opacity: loading ? 0.6 : 1,
-                }}
-              >
-                <Sparkles size={16} />
-                Try the Demo
-              </button>
-              <button
-                type="button"
-                onClick={handleResetApp}
-                disabled={resetting}
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  padding: "13px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  borderRadius: "var(--radius-sm)",
-                  border: "1.5px solid var(--zinc-300)",
-                  background: "transparent",
-                  color: "var(--zinc-600)",
-                  cursor: resetting ? "not-allowed" : "pointer",
-                  opacity: resetting ? 0.6 : 1,
-                }}
-              >
-                <RotateCcw size={16} />
-                {resetting ? "Resetting..." : "Reset App"}
-              </button>
-            </div>
-
-            {resetMsg && (
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "var(--zinc-600)",
-                  background: "var(--zinc-50)",
-                  border: "1px solid var(--zinc-200)",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  marginBottom: "16px",
-                }}
-              >
-                {resetMsg}
-              </div>
-            )}
+            <DemoPanel />
 
             <form
               onSubmit={handleLogin}
-              style={{ display: "flex", flexDirection: "column", gap: "15px" }}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "15px",
+                marginTop: "20px",
+              }}
             >
               <div className="form-stack">
                 <label>
