@@ -375,3 +375,28 @@ def get_demo_users():
     finally:
         cur.close()
         conn.close()
+
+
+@router.post("/demo/reset-app")
+def reset_app():
+    """Public. Wipe all transactional data. Keep admin user, rooms, meal windows, menu."""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM audit_log")
+        cur.execute("DELETE FROM order_items")
+        cur.execute("DELETE FROM orders")
+        cur.execute("DELETE FROM booking_attendees")
+        cur.execute("DELETE FROM bookings")
+        cur.execute("DELETE FROM members")
+        cur.execute("DELETE FROM users WHERE role != 'admin'")
+        for table in ["members", "bookings", "booking_attendees", "orders", "order_items", "audit_log"]:
+            cur.execute(f"ALTER SEQUENCE {table}_id_seq RESTART WITH 1")
+        conn.commit()
+        return {"message": "App reset. Admin user and base config preserved."}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()

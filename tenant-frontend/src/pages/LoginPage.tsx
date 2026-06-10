@@ -3,6 +3,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useTenant } from "../hooks/useTenant";
 import { usersApi } from "../api/client";
 import type { LoginRequest } from "../types/auth";
+import { Sparkles, RotateCcw } from "lucide-react";
 
 type PageMode = "checking" | "setup" | "login";
 type SetupStep =
@@ -756,6 +757,8 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetMsg, setResetMsg] = useState("");
 
   useEffect(() => {
     async function check() {
@@ -788,6 +791,35 @@ export function LoginPage() {
       await loginUser({ email: userEmail, password: "111111" } as LoginRequest);
     } catch {
       setError(`Login failed for ${userEmail}`);
+    }
+  }
+
+  async function handleTryDemo() {
+    setLoading(true);
+    setError("");
+    try {
+      await usersApi.post("/demo/reset-sample");
+      await loginUser({
+        email: "admin@demo.com",
+        password: "111111",
+      } as LoginRequest);
+    } catch {
+      setError("Failed to load demo. Try again.");
+      setLoading(false);
+    }
+  }
+
+  async function handleResetApp() {
+    setResetting(true);
+    setResetMsg("");
+    setError("");
+    try {
+      await usersApi.post("/demo/reset-app");
+      setResetMsg("App reset. You can now log in as admin.");
+    } catch {
+      setError("Reset failed. Try again.");
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -855,7 +887,6 @@ export function LoginPage() {
                       maxWidth: "100%",
                       maxHeight: "200px",
                       objectFit: "contain",
-                      color: "var(--zinc-700)",
                     }}
                   />
                 </div>
@@ -876,6 +907,74 @@ export function LoginPage() {
                 Enter your credentials to continue
               </div>
             </div>
+
+            <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+              <button
+                type="button"
+                onClick={handleTryDemo}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  padding: "13px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  borderRadius: "var(--radius-sm)",
+                  border: "none",
+                  background: "var(--zinc-900)",
+                  color: "white",
+                  cursor: loading ? "not-allowed" : "pointer",
+                  opacity: loading ? 0.6 : 1,
+                }}
+              >
+                <Sparkles size={16} />
+                Try the Demo
+              </button>
+              <button
+                type="button"
+                onClick={handleResetApp}
+                disabled={resetting}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  padding: "13px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  borderRadius: "var(--radius-sm)",
+                  border: "1.5px solid var(--zinc-300)",
+                  background: "transparent",
+                  color: "var(--zinc-600)",
+                  cursor: resetting ? "not-allowed" : "pointer",
+                  opacity: resetting ? 0.6 : 1,
+                }}
+              >
+                <RotateCcw size={16} />
+                {resetting ? "Resetting..." : "Reset App"}
+              </button>
+            </div>
+
+            {resetMsg && (
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "var(--zinc-600)",
+                  background: "var(--zinc-50)",
+                  border: "1px solid var(--zinc-200)",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  marginBottom: "16px",
+                }}
+              >
+                {resetMsg}
+              </div>
+            )}
+
             <form
               onSubmit={handleLogin}
               style={{ display: "flex", flexDirection: "column", gap: "15px" }}
