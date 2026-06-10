@@ -756,8 +756,6 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showDemoPanel, setShowDemoPanel] = useState(false);
-  const [loggingIn, setLoggingIn] = useState<string | null>(null);
 
   useEffect(() => {
     async function check() {
@@ -785,13 +783,11 @@ export function LoginPage() {
   }
 
   async function handleQuickLogin(userEmail: string) {
-    setLoggingIn(userEmail);
     setError("");
     try {
       await loginUser({ email: userEmail, password: "111111" } as LoginRequest);
     } catch {
       setError(`Login failed for ${userEmail}`);
-      setLoggingIn(null);
     }
   }
 
@@ -825,9 +821,9 @@ export function LoginPage() {
       style={{
         minHeight: "100vh",
         display: "flex",
-        alignItems: "flex-start",
+        alignItems: "center",
         justifyContent: "center",
-        padding: "18vh 20px 32px",
+        padding: "20px",
         background: "var(--bg-canvas)",
       }}
     >
@@ -846,7 +842,7 @@ export function LoginPage() {
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    marginBottom: "38px",
+                    marginBottom: "24px",
                   }}
                 >
                   <img
@@ -854,10 +850,10 @@ export function LoginPage() {
                     alt={name}
                     style={{
                       display: "block",
-                      width: "min(82vw, 330px)",
+                      width: "min(92vw, 420px)",
                       height: "auto",
                       maxWidth: "100%",
-                      maxHeight: "140px",
+                      maxHeight: "200px",
                       objectFit: "contain",
                       color: "var(--zinc-700)",
                     }}
@@ -932,61 +928,6 @@ export function LoginPage() {
                 {loading ? "Signing in..." : "Sign in"}
               </button>
             </form>
-            <div
-              style={{
-                marginTop: "24px",
-                borderTop: "1px solid var(--zinc-200)",
-                paddingTop: "20px",
-              }}
-            >
-              <button
-                onClick={() => setShowDemoPanel(!showDemoPanel)}
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  borderRadius: "9px",
-                  border: "1.5px solid var(--zinc-200)",
-                  background: "transparent",
-                  color: "var(--zinc-500)",
-                  fontSize: "13px",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLElement).style.borderColor =
-                    "var(--zinc-400)")
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLElement).style.borderColor =
-                    "var(--zinc-200)")
-                }
-              >
-                {showDemoPanel ? "Hide accounts" : "Quick switch account"}
-              </button>
-              {showDemoPanel && (
-                <div style={{ marginTop: "16px" }}>
-                  <DemoLoginPanel
-                    onLogin={handleQuickLogin}
-                    loggingIn={loggingIn}
-                    open={true}
-                  />
-                </div>
-              )}
-            </div>
-            <div style={{ marginTop: "20px", textAlign: "center" }}>
-              <button
-                onClick={() => setPageMode("setup")}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "12px",
-                  color: "var(--zinc-400)",
-                }}
-              >
-                Reset or reload sample data
-              </button>
-            </div>
           </>
         )}
       </div>
