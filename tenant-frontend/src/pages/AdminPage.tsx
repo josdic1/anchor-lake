@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { usersApi, roomsApi, bookingsApi } from "../api/client";
 import { getAttendees } from "../api/bookings";
+import { useLoading } from "../hooks/useLoading";
 import type { Attendee } from "../types/booking";
 import {
   getMenuItems,
@@ -45,6 +46,15 @@ const TAB_DESCRIPTIONS: Record<Tab, string> = {
   rooms: "Manage dining rooms and capacity",
   "meal-windows": "Set service hours and available days for each meal period",
   bookings: "View and force-update any booking status",
+};
+
+const TAB_LABELS: Record<Tab, string> = {
+  users: "Loading users...",
+  members: "Loading members...",
+  menu: "Loading menu...",
+  rooms: "Loading rooms...",
+  "meal-windows": "Loading hours...",
+  bookings: "Loading bookings...",
 };
 
 function SearchBar({
@@ -108,14 +118,7 @@ function SearchBar({
             alignItems: "center",
             color: "var(--zinc-400)",
             borderRadius: "3px",
-            transition: "color 0.12s ease",
           }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.color = "var(--zinc-700)")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.color = "var(--zinc-400)")
-          }
           title="Clear search"
         >
           <X size={12} />
@@ -136,9 +139,8 @@ function useSortable<T>(
   const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
 
   function handleSort(key: keyof T) {
-    if (key === sortKey) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
+    if (key === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
       setSortKey(key);
       setSortDir("asc");
     }
@@ -150,15 +152,12 @@ function useSortable<T>(
     if (av === null || av === undefined) return 1;
     if (bv === null || bv === undefined) return -1;
     let cmp = 0;
-    if (typeof av === "string" && typeof bv === "string") {
+    if (typeof av === "string" && typeof bv === "string")
       cmp = av.toLowerCase().localeCompare(bv.toLowerCase());
-    } else if (typeof av === "number" && typeof bv === "number") {
-      cmp = av - bv;
-    } else if (typeof av === "boolean" && typeof bv === "boolean") {
+    else if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+    else if (typeof av === "boolean" && typeof bv === "boolean")
       cmp = av === bv ? 0 : av ? -1 : 1;
-    } else {
-      cmp = String(av).localeCompare(String(bv));
-    }
+    else cmp = String(av).localeCompare(String(bv));
     return sortDir === "asc" ? cmp : -cmp;
   });
 
@@ -261,7 +260,6 @@ function PasswordResetModal({
 
   return (
     <div
-      className="modal-overlay"
       style={{
         position: "fixed",
         inset: 0,
@@ -320,7 +318,6 @@ function NeedsAttention({ refreshKey }: { refreshKey: number }) {
           ["SEATED", "SERVICE"].includes(b.status) && b.booking_date < today,
       );
       setStuck(stuckBookings);
-
       const entries = await Promise.all(
         stuckBookings.map(async (b: any) => {
           try {
@@ -417,7 +414,6 @@ function NeedsAttention({ refreshKey }: { refreshKey: number }) {
           const accountName = primary
             ? `${primary.guest_first_name ?? ""} ${primary.guest_last_name ?? ""}`.trim()
             : null;
-
           return (
             <div
               key={b.id}
@@ -566,9 +562,7 @@ function TableShell({
   loading: boolean;
   error: string;
 }) {
-  if (loading) {
-    return <PageLoader label="Loading data..." />;
-  }
+  if (loading) return null;
   if (error)
     return (
       <div className="table-state" style={{ color: "var(--error)" }}>
@@ -688,16 +682,7 @@ const SUB_ROLE_OPTIONS = [
   { value: "manager", label: "Manager" },
 ];
 
-function PageLoader({ label = "Loading..." }: { label?: string }) {
-  return (
-    <div className="page-loading-card" role="status" aria-live="polite">
-      <span className="page-loading-spinner" aria-hidden="true" />
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function UsersTab() {
+function UsersTab({ onDone }: { onDone: () => void }) {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -741,7 +726,10 @@ function UsersTab() {
       .get("/users")
       .then((r) => setUsers(r.data))
       .catch(() => setError("Failed to load users"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        onDone();
+      });
   };
 
   useEffect(() => {
@@ -1176,7 +1164,7 @@ const DIETARY_FLAGS = [
   "VEGETARIAN",
 ];
 
-function MembersTab() {
+function MembersTab({ onDone }: { onDone: () => void }) {
   const [members, setMembers] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1222,7 +1210,10 @@ function MembersTab() {
         setUsers(uRes.data);
       })
       .catch(() => setError("Failed to load members"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        onDone();
+      });
   }, []);
 
   async function toggleActive(m: any) {
@@ -1235,15 +1226,12 @@ function MembersTab() {
   }
 
   async function saveEdit(id: number, userId: number) {
-    const updated = await usersApi.patch(
-      `/users/${userId}/members/${id}`,
-      {
-        ...editForm,
-        dietary_other_note: (editForm.dietary_flags ?? []).includes("OTHER")
-          ? editForm.dietary_other_note?.trim() || null
-          : null,
-      },
-    );
+    const updated = await usersApi.patch(`/users/${userId}/members/${id}`, {
+      ...editForm,
+      dietary_other_note: (editForm.dietary_flags ?? []).includes("OTHER")
+        ? editForm.dietary_other_note?.trim() || null
+        : null,
+    });
     setMembers((prev) => prev.map((m) => (m.id === id ? updated.data : m)));
     setEditingId(null);
   }
@@ -1303,7 +1291,6 @@ function MembersTab() {
       const nextFlags = f.dietary_flags.includes(flag)
         ? f.dietary_flags.filter((x) => x !== flag)
         : [...f.dietary_flags, flag];
-
       return {
         ...f,
         dietary_flags: nextFlags,
@@ -1455,7 +1442,9 @@ function MembersTab() {
                 })}
               </div>
               {newForm.dietary_flags.includes("OTHER") && (
-                <label style={{ marginTop: "10px", display: "grid", gap: "6px" }}>
+                <label
+                  style={{ marginTop: "10px", display: "grid", gap: "6px" }}
+                >
                   <span className="field-label">Other dietary note</span>
                   <input
                     type="text"
@@ -1621,7 +1610,6 @@ function MembersTab() {
                                         (x: string) => x !== flag,
                                       )
                                     : [...(f.dietary_flags ?? []), flag];
-
                                   return {
                                     ...f,
                                     dietary_flags: nextFlags,
@@ -1704,17 +1692,18 @@ function MembersTab() {
                         ? m.dietary_flags.join(", ").replace(/_/g, " ")
                         : "—"}
                     </span>
-                    {m.dietary_flags?.includes("OTHER") && m.dietary_other_note && (
-                      <span
-                        style={{
-                          fontSize: "11px",
-                          color: "var(--zinc-400)",
-                          fontStyle: "italic",
-                        }}
-                      >
-                        {m.dietary_other_note}
-                      </span>
-                    )}
+                    {m.dietary_flags?.includes("OTHER") &&
+                      m.dietary_other_note && (
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--zinc-400)",
+                            fontStyle: "italic",
+                          }}
+                        >
+                          {m.dietary_other_note}
+                        </span>
+                      )}
                   </div>
                 </Td>
                 <Td>
@@ -1788,7 +1777,7 @@ function MembersTab() {
   );
 }
 
-function MenuTab() {
+function MenuTab({ onDone }: { onDone: () => void }) {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1803,14 +1792,16 @@ function MenuTab() {
     dietary_flags: [],
     sort_order: 0,
   });
-
   const { sorted, sortKey, sortDir, handleSort } = useSortable(items, "id");
 
   useEffect(() => {
     getMenuItems()
       .then(setItems)
       .catch(() => setError("Failed to load menu"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        onDone();
+      });
   }, []);
 
   async function saveEdit(id: number) {
@@ -1818,7 +1809,6 @@ function MenuTab() {
     setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
     setEditingId(null);
   }
-
   async function handleToggle(item: MenuItem) {
     if (item.is_active) {
       await deactivateMenuItem(item.id);
@@ -1830,7 +1820,6 @@ function MenuTab() {
       setItems((prev) => prev.map((i) => (i.id === item.id ? updated : i)));
     }
   }
-
   async function handleAdd() {
     const created = await createMenuItem(newForm);
     setItems((prev) => [...prev, created]);
@@ -2163,7 +2152,7 @@ function MenuTab() {
   );
 }
 
-function RoomsTab() {
+function RoomsTab({ onDone }: { onDone: () => void }) {
   const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -2176,7 +2165,6 @@ function RoomsTab() {
     one_booking_max: false,
     dines_only: true,
   });
-
   const { sorted, sortKey, sortDir, handleSort } = useSortable(rooms, "id");
 
   useEffect(() => {
@@ -2184,7 +2172,10 @@ function RoomsTab() {
       .get("/rooms")
       .then((r) => setRooms(r.data))
       .catch(() => setError("Failed to load rooms"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        onDone();
+      });
   }, []);
 
   async function saveEdit(id: number) {
@@ -2192,7 +2183,6 @@ function RoomsTab() {
     setRooms((prev) => prev.map((r) => (r.id === id ? updated.data : r)));
     setEditingId(null);
   }
-
   async function addRoom() {
     const created = await roomsApi.post("/rooms", newForm);
     setRooms((prev) => [...prev, created.data]);
@@ -2204,7 +2194,6 @@ function RoomsTab() {
       dines_only: true,
     });
   }
-
   async function toggleActive(room: any) {
     const updated = await roomsApi.patch(`/rooms/${room.id}`, {
       is_active: !room.is_active,
@@ -2472,7 +2461,13 @@ function RoomsTab() {
   );
 }
 
-function BookingsTab({ onStatusChange }: { onStatusChange: () => void }) {
+function BookingsTab({
+  onStatusChange,
+  onDone,
+}: {
+  onStatusChange: () => void;
+  onDone: () => void;
+}) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [attendeeMap, setAttendeeMap] = useState<Record<number, Attendee[]>>(
     {},
@@ -2480,7 +2475,6 @@ function BookingsTab({ onStatusChange }: { onStatusChange: () => void }) {
   const [roomMap, setRoomMap] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
   const { sorted, sortKey, sortDir, handleSort } = useSortable(
     bookings,
     "id",
@@ -2493,9 +2487,7 @@ function BookingsTab({ onStatusChange }: { onStatusChange: () => void }) {
         const data = bRes.data;
         setBookings(data);
         const rMap: Record<number, string> = {};
-        for (const r of rRes.data) {
-          rMap[r.id] = r.name;
-        }
+        for (const r of rRes.data) rMap[r.id] = r.name;
         setRoomMap(rMap);
         const entries = await Promise.all(
           data.map(async (b: any) => {
@@ -2510,7 +2502,10 @@ function BookingsTab({ onStatusChange }: { onStatusChange: () => void }) {
         setAttendeeMap(Object.fromEntries(entries));
       })
       .catch(() => setError("Failed to load bookings"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        onDone();
+      });
   }, []);
 
   async function forceStatus(id: number, status: string) {
@@ -2613,7 +2608,6 @@ function BookingsTab({ onStatusChange }: { onStatusChange: () => void }) {
             ? `${primary.guest_first_name ?? ""} ${primary.guest_last_name ?? ""}`.trim() ||
               "—"
             : "—";
-
           return (
             <tr key={b.id}>
               <Td mono>#{b.id}</Td>
@@ -2727,7 +2721,7 @@ const DAY_LABELS: Record<number, string> = {
   7: "Sun",
 };
 
-function MealWindowsTab() {
+function MealWindowsTab({ onDone }: { onDone: () => void }) {
   const [windows, setWindows] = useState<MealWindow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -2739,7 +2733,10 @@ function MealWindowsTab() {
     getMealWindows()
       .then(setWindows)
       .catch(() => setError("Failed to load meal windows"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        onDone();
+      });
   }, []);
 
   function startEdit(w: MealWindow) {
@@ -2751,7 +2748,6 @@ function MealWindowsTab() {
       available_days: [...w.available_days],
     });
   }
-
   function toggleDay(day: number) {
     const days = editForm.available_days ?? [];
     setEditForm({
@@ -2780,9 +2776,7 @@ function MealWindowsTab() {
     }
   }
 
-  if (loading) {
-    return <PageLoader label="Loading data..." />;
-  }
+  if (loading) return null;
   if (error)
     return (
       <div className="table-state" style={{ color: "var(--error)" }}>
@@ -2956,7 +2950,20 @@ function MealWindowsTab() {
 export function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>("users");
   const [refreshKey, setRefreshKey] = useState(0);
-  const triggerRefresh = () => setRefreshKey((k) => k + 1);
+  const { setLoading } = useLoading();
+
+  function triggerRefresh() {
+    setRefreshKey((k) => k + 1);
+  }
+
+  function handleTabChange(tab: Tab) {
+    setActiveTab(tab);
+    setLoading(true, TAB_LABELS[tab]);
+  }
+
+  function handleTabDone() {
+    setLoading(false);
+  }
 
   return (
     <div className="fade-in">
@@ -2976,7 +2983,7 @@ export function AdminPage() {
           <button
             key={tab.key}
             type="button"
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => handleTabChange(tab.key)}
             style={{
               padding: "0.5rem 1.25rem",
               fontSize: "13px",
@@ -3008,13 +3015,15 @@ export function AdminPage() {
       >
         {TAB_DESCRIPTIONS[activeTab]}
       </p>
-      {activeTab === "users" && <UsersTab />}
-      {activeTab === "members" && <MembersTab />}
-      {activeTab === "menu" && <MenuTab />}
-      {activeTab === "rooms" && <RoomsTab />}
-      {activeTab === "meal-windows" && <MealWindowsTab />}
+      {activeTab === "users" && <UsersTab onDone={handleTabDone} />}
+      {activeTab === "members" && <MembersTab onDone={handleTabDone} />}
+      {activeTab === "menu" && <MenuTab onDone={handleTabDone} />}
+      {activeTab === "rooms" && <RoomsTab onDone={handleTabDone} />}
+      {activeTab === "meal-windows" && (
+        <MealWindowsTab onDone={handleTabDone} />
+      )}
       {activeTab === "bookings" && (
-        <BookingsTab onStatusChange={triggerRefresh} />
+        <BookingsTab onStatusChange={triggerRefresh} onDone={handleTabDone} />
       )}
     </div>
   );

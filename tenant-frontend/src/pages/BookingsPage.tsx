@@ -11,6 +11,7 @@ import { BookingsFilters } from "../components/bookings/BookingsFilters";
 import { BookingsTable } from "../components/bookings/BookingsTable";
 import { BookingDetailPanel } from "../components/bookings/BookingDetailPanel";
 import { useAuth } from "../hooks/useAuth";
+import { useLoading } from "../hooks/useLoading";
 import type { Attendee, Booking, Room } from "../types/booking";
 
 const EMPTY_FILTERS: BookingSearchParams = {};
@@ -24,15 +25,6 @@ const QUICK_TABS: { key: QuickTab; label: string }[] = [
   { key: "past", label: "Past" },
   { key: "all", label: "All" },
 ];
-
-function PageLoader({ label = "Loading..." }: { label?: string }) {
-  return (
-    <div className="page-loading-card" role="status" aria-live="polite">
-      <span className="page-loading-spinner" aria-hidden="true" />
-      <span>{label}</span>
-    </div>
-  );
-}
 
 function getToday() {
   return new Date().toISOString().slice(0, 10);
@@ -65,7 +57,6 @@ function applyFilters(
   attendeeMap: Record<number, Attendee[]>,
 ): Booking[] {
   let result = bookings;
-
   if (filters.dateFrom)
     result = result.filter((b) => b.booking_date >= filters.dateFrom!);
   if (filters.dateTo)
@@ -76,7 +67,6 @@ function applyFilters(
     result = result.filter((b) => b.meal_type === filters.mealType);
   if (filters.roomId)
     result = result.filter((b) => String(b.room_id) === filters.roomId);
-
   if (filters.memberQuery) {
     const q = filters.memberQuery.toLowerCase().trim();
     result = result.filter((b) => {
@@ -89,7 +79,6 @@ function applyFilters(
       );
     });
   }
-
   return result;
 }
 
@@ -103,36 +92,28 @@ function smartSort(bookings: Booking[]): Booking[] {
     COMPLETED: 4,
     CANCELLED: 5,
   };
-
   return [...bookings].sort((a, b) => {
-    // Today's bookings first
     const aToday = a.booking_date === today ? 0 : 1;
     const bToday = b.booking_date === today ? 0 : 1;
     if (aToday !== bToday) return aToday - bToday;
-
-    // Within same day group, sort by status priority
     const aPri = STATUS_PRIORITY[a.status] ?? 99;
     const bPri = STATUS_PRIORITY[b.status] ?? 99;
     if (aPri !== bPri) return aPri - bPri;
-
-    // Then by date descending (newest first)
     if (a.booking_date !== b.booking_date)
       return a.booking_date > b.booking_date ? -1 : 1;
-
-    // Then by arrival time ascending
     return (a.estimated_arrival ?? "").localeCompare(b.estimated_arrival ?? "");
   });
 }
 
 export function BookingsPage() {
   const { user } = useAuth();
+  const { setLoading } = useLoading();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [attendeeMap, setAttendeeMap] = useState<Record<number, Attendee[]>>(
     {},
   );
   const [ordersMap, setOrdersMap] = useState<Record<number, boolean>>({});
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState<BookingSearchParams>(EMPTY_FILTERS);
   const [quickTab, setQuickTab] = useState<QuickTab>("today");
@@ -143,18 +124,15 @@ export function BookingsPage() {
 
   useEffect(() => {
     async function load() {
-      setLoading(true);
+      setLoading(true, "Loading bookings...");
       setError("");
-
       try {
         const [bookingsData, roomsData] = await Promise.all([
           user?.role === "member" ? getMyBookings() : getAllBookings(),
           roomsApi.get<Room[]>("/rooms").then((r) => r.data),
         ]);
-
         setBookings(bookingsData);
         setRooms(roomsData);
-
         const entries = await Promise.all(
           bookingsData.map(async (b) => {
             try {
@@ -168,7 +146,6 @@ export function BookingsPage() {
             }
           }),
         );
-
         setAttendeeMap(
           Object.fromEntries(entries.map((e) => [e.id, e.attendees])),
         );
@@ -183,11 +160,9 @@ export function BookingsPage() {
         setLoading(false);
       }
     }
-
     void load();
   }, [user?.role]);
 
-  // Compute tab counts
   const tabCounts = useMemo(() => {
     const today = getToday();
     return {
@@ -229,10 +204,6 @@ export function BookingsPage() {
     !!filters.roomId ||
     !!filters.memberQuery;
 
-  if (loading) {
-    return <PageLoader label="Loading bookings..." />;
-  }
-
   if (error) {
     return (
       <div className="page-loading-card page-loading-card--error" role="alert">
@@ -250,7 +221,6 @@ export function BookingsPage() {
           <h2 className="page-title">Bookings</h2>
         </div>
 
-        {/* Quick tabs */}
         <div
           style={{
             display: "flex",
@@ -289,18 +259,13 @@ export function BookingsPage() {
               >
                 {tab.label}
                 <span
-                  style={{
-                    fontSize: "10px",
-                    opacity: 0.7,
-                    fontWeight: 600,
-                  }}
+                  style={{ fontSize: "10px", opacity: 0.7, fontWeight: 600 }}
                 >
                   {count}
                 </span>
               </button>
             );
           })}
-
           <button
             onClick={() => setShowFilters(!showFilters)}
             style={{
@@ -320,7 +285,6 @@ export function BookingsPage() {
           </button>
         </div>
 
-        {/* Advanced filters (collapsible) */}
         {showFilters && (
           <BookingsFilters
             filters={filters}
@@ -337,7 +301,7 @@ export function BookingsPage() {
           ordersMap={ordersMap}
           selectedBookingId={selectedBookingId}
           onSelectBooking={handleSelectBooking}
-          loading={loading}
+          loading={false}
           error={error}
         />
       </div>
