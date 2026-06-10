@@ -847,6 +847,16 @@ const ALL_BOOKING_FIELDS: { key: string; label: string; group: string }[] = [
 
 const FIELD_GROUPS = ["Booking", "People", "Dietary", "Orders"];
 
+
+function PageLoader({ label = "Loading..." }: { label?: string }) {
+  return (
+    <div className="page-loading-card" role="status" aria-live="polite">
+      <span className="page-loading-spinner" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function ReportsPage() {
@@ -1115,12 +1125,7 @@ export function ReportsPage() {
   );
 
   if (loading) {
-    return (
-      <div className="table-state table-state--loading">
-        <span className="page-spinner" />
-        <span>Loading report data...</span>
-      </div>
-    );
+    return <PageLoader label="Loading report data..." />;
   }
 
   return (

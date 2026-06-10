@@ -73,7 +73,7 @@ export function AppShell({ children }: AppShellProps) {
 
   useEffect(() => {
     setRouteLoading(true);
-    const t = window.setTimeout(() => setRouteLoading(false), 220);
+    const t = window.setTimeout(() => setRouteLoading(false), 650);
     return () => window.clearTimeout(t);
   }, [location.pathname]);
 
@@ -304,7 +304,12 @@ export function AppShell({ children }: AppShellProps) {
       </header>
 
       <main className={`app-main ${!isAuthenticated ? "app-main--guest" : ""}`}>
-        {routeLoading && <div className="app-route-loader" aria-hidden="true" />}
+        {routeLoading && isAuthenticated && (
+          <div className="app-route-loader" role="status" aria-live="polite">
+            <span className="page-loading-spinner" aria-hidden="true" />
+            <span>Loading page...</span>
+          </div>
+        )}
         {children}
       </main>
 

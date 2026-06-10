@@ -567,12 +567,7 @@ function TableShell({
   error: string;
 }) {
   if (loading) {
-    return (
-      <div className="table-state table-state--loading">
-        <span className="page-spinner" />
-        <span>Loading...</span>
-      </div>
-    );
+    return <PageLoader label="Loading data..." />;
   }
   if (error)
     return (
@@ -692,6 +687,15 @@ const SUB_ROLE_OPTIONS = [
   { value: "kitchen", label: "Kitchen" },
   { value: "manager", label: "Manager" },
 ];
+
+function PageLoader({ label = "Loading..." }: { label?: string }) {
+  return (
+    <div className="page-loading-card" role="status" aria-live="polite">
+      <span className="page-loading-spinner" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
+}
 
 function UsersTab() {
   const [users, setUsers] = useState<any[]>([]);
@@ -2777,12 +2781,7 @@ function MealWindowsTab() {
   }
 
   if (loading) {
-    return (
-      <div className="table-state table-state--loading">
-        <span className="page-spinner" />
-        <span>Loading...</span>
-      </div>
-    );
+    return <PageLoader label="Loading data..." />;
   }
   if (error)
     return (

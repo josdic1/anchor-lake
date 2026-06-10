@@ -1738,3 +1738,74 @@ hr {
     transform: rotate(360deg);
   }
 }
+
+
+/* ================================================================
+   PAGE LOADERS
+   ================================================================ */
+
+@keyframes page-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.page-loading-card {
+  min-height: min(420px, calc(100dvh - 180px));
+  width: 100%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--zinc-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  color: var(--zinc-600);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.page-loading-card--error {
+  color: var(--error);
+  min-height: 180px;
+}
+
+.page-loading-spinner,
+.page-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 3px solid var(--zinc-200);
+  border-top-color: var(--zinc-900);
+  animation: page-loader-spin 0.75s linear infinite;
+}
+
+.table-state--loading {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+}
+
+.app-route-loader {
+  position: fixed;
+  inset: 72px 0 0 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  background: rgba(243, 230, 196, 0.82);
+  backdrop-filter: blur(3px);
+  color: var(--zinc-700);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.app-shell--guest .app-route-loader {
+  inset: 0;
+}

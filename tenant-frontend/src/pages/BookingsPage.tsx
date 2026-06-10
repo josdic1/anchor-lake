@@ -25,6 +25,15 @@ const QUICK_TABS: { key: QuickTab; label: string }[] = [
   { key: "all", label: "All" },
 ];
 
+function PageLoader({ label = "Loading..." }: { label?: string }) {
+  return (
+    <div className="page-loading-card" role="status" aria-live="polite">
+      <span className="page-loading-spinner" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
 function getToday() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -219,6 +228,18 @@ export function BookingsPage() {
     !!filters.mealType ||
     !!filters.roomId ||
     !!filters.memberQuery;
+
+  if (loading) {
+    return <PageLoader label="Loading bookings..." />;
+  }
+
+  if (error) {
+    return (
+      <div className="page-loading-card page-loading-card--error" role="alert">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div
