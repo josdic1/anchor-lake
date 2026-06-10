@@ -80,6 +80,19 @@ def normalize_member(row) -> dict:
     return d
 
 
+def clean_dietary_other_note(flags, note):
+    flags = flags or []
+
+    if "OTHER" not in flags:
+        return None
+
+    if note is None:
+        return None
+
+    stripped = note.strip()
+    return stripped or None
+
+
 def normalize_email(email: str) -> str:
     return email.lower().strip()
 
@@ -431,6 +444,11 @@ def create_member(user_id: int, body: MemberCreate, current_user: dict = Depends
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="User not found")
 
+        dietary_other_note = clean_dietary_other_note(
+            body.dietary_flags,
+            body.dietary_other_note,
+        )
+
         cur.execute(
             """
             INSERT INTO members (user_id, first_name, last_name, relation, dietary_flags, dietary_other_note, notes)
@@ -444,7 +462,7 @@ def create_member(user_id: int, body: MemberCreate, current_user: dict = Depends
                 body.last_name,
                 body.relation,
                 body.dietary_flags,
-                body.dietary_other_note,
+                dietary_other_note,
                 body.notes,
             ),
         )
@@ -468,9 +486,30 @@ def update_member(
     conn = get_connection()
     cur = conn.cursor()
     try:
-        fields = body.model_dump(exclude_none=True)
+        fields = body.model_dump(exclude_unset=True)
+
         if not fields:
             raise HTTPException(status_code=400, detail="No fields provided to update")
+
+        if "dietary_flags" in fields or "dietary_other_note" in fields:
+            if "dietary_flags" in fields:
+                next_flags = fields.get("dietary_flags") or []
+            else:
+                cur.execute(
+                    """
+                    SELECT dietary_flags
+                    FROM members
+                    WHERE id = %s AND user_id = %s
+                    """,
+                    (member_id, user_id),
+                )
+                existing = cur.fetchone()
+                next_flags = parse_pg_array(existing["dietary_flags"]) if existing else []
+
+            fields["dietary_other_note"] = clean_dietary_other_note(
+                next_flags,
+                fields.get("dietary_other_note"),
+            )
 
         set_parts = []
         for k in fields:
@@ -497,6 +536,7 @@ def update_member(
         member = cur.fetchone()
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
+
         return normalize_member(member)
     finally:
         cur.close()
