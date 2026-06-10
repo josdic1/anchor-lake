@@ -210,84 +210,159 @@ def seed_sample_data(cur, hashed_pw, admin_id):
     booking_count = 0
     current_date = start_date
 
+    # Guarantee today has a full spread of statuses across all rooms
+    TODAY_SCENARIOS = [
+        {"meal_type": "LUNCH", "status": "CONFIRMED", "arrival": "12:00"},
+        {"meal_type": "LUNCH", "status": "SEATED", "arrival": "12:00", "kitchen_status": "INCOMING"},
+        {"meal_type": "LUNCH", "status": "SERVICE", "arrival": "12:00", "kitchen_status": "IN_KITCHEN"},
+        {"meal_type": "LUNCH", "status": "SERVICE", "arrival": "12:30", "kitchen_status": "READY"},
+        {"meal_type": "DINNER", "status": "CONFIRMED", "arrival": "18:30"},
+        {"meal_type": "DINNER", "status": "CONFIRMED", "arrival": "19:00"},
+        {"meal_type": "DINNER", "status": "SEATED", "arrival": "18:30", "kitchen_status": "IN_KITCHEN"},
+        {"meal_type": "DINNER", "status": "SERVICE", "arrival": "18:00", "kitchen_status": "READY"},
+    ]
+
     end_date = today + timedelta(days=7)
     while current_date <= end_date:
-        daily_count = random.randint(2, 5)
         used_rooms_lunch: set = set()
         used_rooms_dinner: set = set()
         used_members: set = set()
 
-        for _ in range(daily_count):
-            meal_type = random.choice(["LUNCH", "DINNER"])
-            used_rooms = used_rooms_lunch if meal_type == "LUNCH" else used_rooms_dinner
+        if current_date == today:
+            scenarios = TODAY_SCENARIOS[:]
+            random.shuffle(scenarios)
+            available_rooms_lunch = [r for r in rooms]
+            available_rooms_dinner = [r for r in rooms]
 
-            available_rooms = [r for r in rooms if r["id"] not in used_rooms]
-            if not available_rooms:
-                continue
+            for scenario in scenarios:
+                meal_type = scenario["meal_type"]
+                used_rooms = used_rooms_lunch if meal_type == "LUNCH" else used_rooms_dinner
+                available_rooms = [r for r in (available_rooms_lunch if meal_type == "LUNCH" else available_rooms_dinner) if r["id"] not in used_rooms]
+                if not available_rooms:
+                    continue
 
-            room = random.choice(available_rooms)
-            used_rooms.add(room["id"])
+                available_users = [(uid, mids) for uid, mids in all_member_ids if uid not in used_members]
+                if not available_users:
+                    continue
 
-            available_users = [(uid, mids) for uid, mids in all_member_ids if uid not in used_members]
-            if not available_users:
-                continue
+                room = random.choice(available_rooms)
+                used_rooms.add(room["id"])
+                user_id, household_member_ids = random.choice(available_users)
+                used_members.add(user_id)
 
-            user_id, household_member_ids = random.choice(available_users)
-            used_members.add(user_id)
-
-            arrival = "12:00" if meal_type == "LUNCH" else "18:30"
-
-            if current_date < today:
-                status = "COMPLETED"
-            elif current_date == today:
-                status = random.choice(["CONFIRMED", "SEATED", "SERVICE", "CONFIRMED"])
-            else:
-                status = "CONFIRMED"
-
-            cur.execute("""
-                INSERT INTO bookings (
-                    booking_member_id, room_id, booking_date, meal_type,
-                    estimated_arrival, status, party_size, is_special_event,
-                    confirmed_at, seated_at, service_at, completed_at
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE, %s, %s, %s, %s)
-                RETURNING id
-            """, (
-                user_id, room["id"], current_date, meal_type,
-                arrival, status,
-                len(household_member_ids),
-                datetime.combine(current_date, datetime.strptime("10:00", "%H:%M").time()),
-                datetime.combine(current_date, datetime.strptime(arrival, "%H:%M").time()) if status in ("SEATED", "SERVICE", "COMPLETED") else None,
-                datetime.combine(current_date, datetime.strptime(arrival, "%H:%M").time()) if status in ("SERVICE", "COMPLETED") else None,
-                datetime.combine(current_date, datetime.strptime("21:00", "%H:%M").time()) if status == "COMPLETED" else None,
-            ))
-            booking_id = cur.fetchone()["id"]
-            booking_count += 1
-
-            for member_id in household_member_ids:
-                cur.execute("""
-                    INSERT INTO booking_attendees (booking_id, linked_member_id, is_member_guest, dietary_flags)
-                    VALUES (%s, %s, FALSE, '{}')
-                """, (booking_id, member_id))
-
-            if status in ("SERVICE", "COMPLETED"):
-                created_by = random.choice(staff_ids) if staff_ids else admin_id
-                kitchen_status = "SERVED" if status == "COMPLETED" else "IN_KITCHEN"
-                fired_at = datetime.combine(current_date, datetime.strptime(arrival, "%H:%M").time())
+                status = scenario["status"]
+                arrival = scenario["arrival"]
+                now = datetime.combine(today, datetime.strptime(arrival, "%H:%M").time())
 
                 cur.execute("""
-                    INSERT INTO orders (booking_id, created_by, kitchen_status, fired_at, print_triggered)
-                    VALUES (%s, %s, %s, %s, TRUE)
+                    INSERT INTO bookings (
+                        booking_member_id, room_id, booking_date, meal_type,
+                        estimated_arrival, status, party_size, is_special_event,
+                        confirmed_at, seated_at, service_at, completed_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE, %s, %s, %s, %s)
                     RETURNING id
-                """, (booking_id, created_by, kitchen_status, fired_at))
-                order_id = cur.fetchone()["id"]
+                """, (
+                    user_id, room["id"], current_date, meal_type,
+                    arrival, status, len(household_member_ids),
+                    now,
+                    now if status in ("SEATED", "SERVICE") else None,
+                    now if status == "SERVICE" else None,
+                    None,
+                ))
+                booking_id = cur.fetchone()["id"]
+                booking_count += 1
 
-                order_items = random.sample(menu_items, min(random.randint(2, 4), len(menu_items)))
-                for item in order_items:
+                for member_id in household_member_ids:
                     cur.execute("""
-                        INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, modifier_ids)
-                        VALUES (%s, %s, %s, %s, '{}')
-                    """, (order_id, item["id"], random.randint(1, 2), item["price"]))
+                        INSERT INTO booking_attendees (booking_id, linked_member_id, is_member_guest, dietary_flags)
+                        VALUES (%s, %s, FALSE, '{}')
+                    """, (booking_id, member_id))
+
+                if status in ("SEATED", "SERVICE") and "kitchen_status" in scenario:
+                    created_by = random.choice(staff_ids) if staff_ids else admin_id
+                    kitchen_status = scenario["kitchen_status"]
+                    fired_at = now if status == "SERVICE" else None
+
+                    cur.execute("""
+                        INSERT INTO orders (booking_id, created_by, kitchen_status, fired_at, print_triggered)
+                        VALUES (%s, %s, %s, %s, %s)
+                        RETURNING id
+                    """, (booking_id, created_by, kitchen_status, fired_at, fired_at is not None))
+                    order_id = cur.fetchone()["id"]
+
+                    selected_items = random.sample(menu_items, min(random.randint(2, 4), len(menu_items)))
+                    for item in selected_items:
+                        cur.execute("""
+                            INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, modifier_ids)
+                            VALUES (%s, %s, %s, %s, '{}')
+                        """, (order_id, item["id"], random.randint(1, 2), item["price"]))
+
+        else:
+            daily_count = random.randint(2, 5)
+            for _ in range(daily_count):
+                meal_type = random.choice(["LUNCH", "DINNER"])
+                used_rooms = used_rooms_lunch if meal_type == "LUNCH" else used_rooms_dinner
+
+                available_rooms = [r for r in rooms if r["id"] not in used_rooms]
+                if not available_rooms:
+                    continue
+
+                room = random.choice(available_rooms)
+                used_rooms.add(room["id"])
+
+                available_users = [(uid, mids) for uid, mids in all_member_ids if uid not in used_members]
+                if not available_users:
+                    continue
+
+                user_id, household_member_ids = random.choice(available_users)
+                used_members.add(user_id)
+
+                arrival = "12:00" if meal_type == "LUNCH" else "18:30"
+                status = "COMPLETED" if current_date < today else "CONFIRMED"
+
+                cur.execute("""
+                    INSERT INTO bookings (
+                        booking_member_id, room_id, booking_date, meal_type,
+                        estimated_arrival, status, party_size, is_special_event,
+                        confirmed_at, seated_at, service_at, completed_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE, %s, %s, %s, %s)
+                    RETURNING id
+                """, (
+                    user_id, room["id"], current_date, meal_type,
+                    arrival, status, len(household_member_ids),
+                    datetime.combine(current_date, datetime.strptime("10:00", "%H:%M").time()),
+                    datetime.combine(current_date, datetime.strptime(arrival, "%H:%M").time()) if status == "COMPLETED" else None,
+                    datetime.combine(current_date, datetime.strptime(arrival, "%H:%M").time()) if status == "COMPLETED" else None,
+                    datetime.combine(current_date, datetime.strptime("21:00", "%H:%M").time()) if status == "COMPLETED" else None,
+                ))
+                booking_id = cur.fetchone()["id"]
+                booking_count += 1
+
+                for member_id in household_member_ids:
+                    cur.execute("""
+                        INSERT INTO booking_attendees (booking_id, linked_member_id, is_member_guest, dietary_flags)
+                        VALUES (%s, %s, FALSE, '{}')
+                    """, (booking_id, member_id))
+
+                if status == "COMPLETED":
+                    created_by = random.choice(staff_ids) if staff_ids else admin_id
+                    fired_at = datetime.combine(current_date, datetime.strptime(arrival, "%H:%M").time())
+
+                    cur.execute("""
+                        INSERT INTO orders (booking_id, created_by, kitchen_status, fired_at, print_triggered)
+                        VALUES (%s, %s, 'SERVED', %s, TRUE)
+                        RETURNING id
+                    """, (booking_id, created_by, fired_at))
+                    order_id = cur.fetchone()["id"]
+
+                    selected_items = random.sample(menu_items, min(random.randint(2, 4), len(menu_items)))
+                    for item in selected_items:
+                        cur.execute("""
+                            INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, modifier_ids)
+                            VALUES (%s, %s, %s, %s, '{}')
+                        """, (order_id, item["id"], random.randint(1, 2), item["price"]))
 
         current_date += timedelta(days=1)
 
@@ -304,7 +379,6 @@ def seed_sample_data(cur, hashed_pw, admin_id):
 
 @router.get("/demo/needs-setup")
 def needs_setup():
-    """Public. Returns true if no users exist yet — triggers setup flow on login page."""
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -318,7 +392,6 @@ def needs_setup():
 
 @router.post("/demo/reset-fresh")
 def reset_fresh():
-    """Public. Wipe everything. Seed only admin@demo.com."""
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -337,7 +410,6 @@ def reset_fresh():
 
 @router.post("/demo/reset-sample")
 def reset_sample():
-    """Public. Wipe everything. Seed full sample data with 2 months of bookings."""
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -361,7 +433,6 @@ def reset_sample():
 
 @router.get("/demo/users")
 def get_demo_users():
-    """Auth required. Returns all active users for the quick-login panel."""
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -379,7 +450,6 @@ def get_demo_users():
 
 @router.post("/demo/reset-app")
 def reset_app():
-    """Public. Wipe all transactional data. Keep admin user, rooms, meal windows, menu."""
     conn = get_connection()
     cur = conn.cursor()
     try:
