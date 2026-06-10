@@ -54,7 +54,6 @@ export function AppShell({ children }: AppShellProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isOnNewBookingPage = location.pathname === "/booking";
-  const [routeLoading, setRouteLoading] = useState(false);
 
   const isAdmin = user?.role === "admin";
   const isStaffOrAdmin = user?.role === "staff" || isAdmin;
@@ -70,12 +69,6 @@ export function AppShell({ children }: AppShellProps) {
       return () => clearTimeout(t);
     }
   }, [isAuthenticated]);
-
-  useEffect(() => {
-    setRouteLoading(true);
-    const t = window.setTimeout(() => setRouteLoading(false), 650);
-    return () => window.clearTimeout(t);
-  }, [location.pathname]);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -304,12 +297,6 @@ export function AppShell({ children }: AppShellProps) {
       </header>
 
       <main className={`app-main ${!isAuthenticated ? "app-main--guest" : ""}`}>
-        {routeLoading && isAuthenticated && (
-          <div className="app-route-loader" role="status" aria-live="polite">
-            <span className="page-loading-spinner" aria-hidden="true" />
-            <span>Loading page...</span>
-          </div>
-        )}
         {children}
       </main>
 
