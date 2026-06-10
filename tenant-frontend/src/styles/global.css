@@ -6,7 +6,7 @@
 
 :root {
   /* Old golf club palette */
-  --bg-canvas: #f3e6c4;
+  --bg-canvas: #fff4d8;
   --bg-surface: #fff9e8;
   --zinc-50: #fbf4df;
   --zinc-100: #f3e9cd;
@@ -1646,4 +1646,84 @@ hr {
   .modifier-panel {
     width: min(400px, calc(100vw - 2rem));
   }
+}
+
+/* ================================================================
+   SHELL GUEST MODE
+   ================================================================ */
+
+.app-shell--guest {
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.app-main--guest {
+  padding: 0;
+  min-height: calc(100dvh - 72px);
+  overflow: hidden;
+}
+
+/* ================================================================
+   FADE IN
+   ================================================================ */
+
+.fade-in {
+  animation: fadeIn 0.25s ease both;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ================================================================
+   PAGE LOADERS
+   ================================================================ */
+
+@keyframes page-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.page-loading-card {
+  min-height: min(420px, calc(100dvh - 180px));
+  width: 100%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  color: var(--zinc-500);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.page-loading-card--error {
+  color: var(--error);
+  min-height: 180px;
+}
+
+.page-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 2px solid var(--zinc-200);
+  border-top-color: var(--zinc-700);
+  animation: page-loader-spin 0.75s linear infinite;
+}
+
+.table-state {
+  min-height: 220px;
+  padding: 4rem 2rem;
+  text-align: center;
+  color: var(--zinc-400);
+  font-size: 14px;
+  display: grid;
+  place-items: center;
 }

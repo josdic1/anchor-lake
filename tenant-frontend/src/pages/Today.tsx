@@ -53,13 +53,13 @@ const MEAL_LABELS: Record<string, string> = {
   SPECIAL_EVENT: "Special Event",
 };
 
-const STATUS_DOT: Record<string, string> = {
-  CONFIRMED: "#3b82f6",
-  SEATED: "#22c55e",
-  SERVICE: "#f59e0b",
-  COMPLETED: "#a1a1aa",
-  CANCELLED: "#ef4444",
-  DRAFT: "#d4d4d8",
+const STATUS_COLORS: Record<string, { dot: string; label: string }> = {
+  CONFIRMED: { dot: "var(--zinc-400)", label: "Arriving" },
+  SEATED: { dot: "var(--zinc-600)", label: "Seated" },
+  SERVICE: { dot: "var(--accent)", label: "In Service" },
+  COMPLETED: { dot: "var(--zinc-300)", label: "Completed" },
+  CANCELLED: { dot: "var(--zinc-300)", label: "Cancelled" },
+  DRAFT: { dot: "var(--zinc-200)", label: "Draft" },
 };
 
 function collectDietary(enriched: EnrichedBooking[]): Record<string, string[]> {
@@ -82,43 +82,22 @@ function collectDietary(enriched: EnrichedBooking[]): Record<string, string[]> {
   return map;
 }
 
-function Kicker({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: "9px",
-        fontWeight: 800,
-        letterSpacing: "0.18em",
-        textTransform: "uppercase",
-        color: "var(--accent, #a38a64)",
-        marginBottom: "6px",
-        fontFamily: "var(--font-body)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
 function Card({
   children,
-  style,
   className,
 }: {
   children: React.ReactNode;
-  style?: React.CSSProperties;
   className?: string;
 }) {
   return (
     <div
       className={className}
       style={{
-        background: "rgba(255,255,255,0.97)",
-        border: "1px solid rgba(228,222,214,0.9)",
-        borderRadius: "20px",
-        padding: "22px 24px",
-        boxShadow: "0 2px 12px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)",
-        ...style,
+        background: "var(--bg-surface)",
+        border: "1px solid var(--zinc-200)",
+        borderRadius: "var(--radius-lg)",
+        padding: "24px 28px",
+        boxShadow: "var(--shadow-sm)",
       }}
     >
       {children}
@@ -126,118 +105,20 @@ function Card({
   );
 }
 
-function StatPill({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string | number;
-  accent?: string;
-}) {
+function Kicker({ children }: { children: React.ReactNode }) {
   return (
     <div
       style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "14px 20px",
-        background: accent ? `${accent}12` : "rgba(248,245,241,0.9)",
-        border: `1px solid ${accent ? `${accent}30` : "rgba(228,222,214,0.8)"}`,
-        borderRadius: "14px",
-        minWidth: "80px",
+        fontSize: "10px",
+        fontWeight: 600,
+        letterSpacing: "0.14em",
+        textTransform: "uppercase",
+        color: "var(--accent)",
+        marginBottom: "4px",
       }}
     >
-      <span
-        style={{
-          fontSize: "28px",
-          fontWeight: 700,
-          color: accent ?? "#18181b",
-          lineHeight: 1,
-          fontFamily: "var(--font-display)",
-        }}
-      >
-        {value}
-      </span>
-      <span
-        style={{
-          fontSize: "10px",
-          fontWeight: 700,
-          color: accent ?? "#9b948b",
-          textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          marginTop: "5px",
-          fontFamily: "var(--font-body)",
-        }}
-      >
-        {label}
-      </span>
+      {children}
     </div>
-  );
-}
-
-function FilterPill({
-  label,
-  value,
-  accent,
-  selected,
-  onClick,
-}: {
-  label: string;
-  value: string | number;
-  accent?: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "14px 20px",
-        background: selected
-          ? (accent ?? "#18181b")
-          : accent
-            ? `${accent}12`
-            : "rgba(248,245,241,0.9)",
-        border: selected
-          ? `1.5px solid ${accent ?? "#18181b"}`
-          : `1px solid ${accent ? `${accent}30` : "rgba(228,222,214,0.8)"}`,
-        borderRadius: "14px",
-        minWidth: "80px",
-        cursor: "pointer",
-        transition: "all 0.15s ease",
-        outline: "none",
-        boxShadow: selected ? "0 4px 14px rgba(0,0,0,0.12)" : "none",
-      }}
-    >
-      <span
-        style={{
-          fontSize: "28px",
-          fontWeight: 700,
-          color: selected ? "white" : (accent ?? "#18181b"),
-          lineHeight: 1,
-          fontFamily: "var(--font-display)",
-        }}
-      >
-        {value}
-      </span>
-      <span
-        style={{
-          fontSize: "10px",
-          fontWeight: 700,
-          color: selected ? "rgba(255,255,255,0.85)" : (accent ?? "#9b948b"),
-          textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          marginTop: "5px",
-          fontFamily: "var(--font-body)",
-        }}
-      >
-        {label}
-      </span>
-    </button>
   );
 }
 
@@ -264,7 +145,7 @@ function SectionTitle({
           fontSize: "18px",
           fontWeight: 500,
           fontFamily: "var(--font-display)",
-          color: "#18181b",
+          color: "var(--zinc-900)",
         }}
       >
         {children}
@@ -276,22 +157,117 @@ function SectionTitle({
             display: "inline-flex",
             alignItems: "center",
             gap: "6px",
-            padding: "8px 18px",
-            borderRadius: "999px",
-            background: "#18181b",
-            color: "white",
+            padding: "6px 16px",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--zinc-900)",
+            color: "var(--bg-surface)",
             fontSize: "12px",
-            fontWeight: 600,
-            fontFamily: "var(--font-body)",
-            letterSpacing: "0.04em",
+            fontWeight: 500,
             textDecoration: "none",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.14)",
           }}
         >
           {linkLabel}
         </a>
       )}
     </div>
+  );
+}
+
+function StatPill({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        padding: "14px 20px",
+        background: "var(--bg-surface)",
+        border: "1px solid var(--zinc-200)",
+        borderRadius: "var(--radius-md)",
+        minWidth: "80px",
+        boxShadow: "var(--shadow-sm)",
+      }}
+    >
+      <span
+        style={{
+          fontSize: "28px",
+          fontWeight: 600,
+          color: "var(--zinc-900)",
+          lineHeight: 1,
+          fontFamily: "var(--font-display)",
+        }}
+      >
+        {value}
+      </span>
+      <span
+        style={{
+          fontSize: "10px",
+          fontWeight: 600,
+          color: "var(--zinc-400)",
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          marginTop: "5px",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function FilterPill({
+  label,
+  value,
+  selected,
+  onClick,
+}: {
+  label: string;
+  value: string | number;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        padding: "14px 20px",
+        background: selected ? "var(--zinc-900)" : "var(--bg-surface)",
+        border: `1.5px solid ${selected ? "var(--zinc-900)" : "var(--zinc-200)"}`,
+        borderRadius: "var(--radius-md)",
+        minWidth: "80px",
+        cursor: "pointer",
+        transition: "all 0.15s ease",
+        outline: "none",
+        boxShadow: "var(--shadow-sm)",
+      }}
+    >
+      <span
+        style={{
+          fontSize: "28px",
+          fontWeight: 600,
+          color: selected ? "var(--bg-surface)" : "var(--zinc-900)",
+          lineHeight: 1,
+          fontFamily: "var(--font-display)",
+        }}
+      >
+        {value}
+      </span>
+      <span
+        style={{
+          fontSize: "10px",
+          fontWeight: 600,
+          color: selected ? "rgba(255,255,255,0.7)" : "var(--zinc-400)",
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          marginTop: "5px",
+        }}
+      >
+        {label}
+      </span>
+    </button>
   );
 }
 
@@ -309,7 +285,7 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
           padding: "32px",
           textAlign: "center",
           fontSize: "14px",
-          color: "#9b948b",
+          color: "var(--zinc-400)",
           fontStyle: "italic",
         }}
       >
@@ -322,8 +298,7 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       {sorted.map((e) => {
         const { booking, attendees, room } = e;
-        const dot = STATUS_DOT[booking.status] ?? "#d4d4d8";
-
+        const sc = STATUS_COLORS[booking.status] ?? STATUS_COLORS.DRAFT;
         const primary =
           attendees.find((a) => a.linked_member_id && !a.is_member_guest) ??
           attendees[0];
@@ -331,7 +306,6 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
           ? `${primary.guest_first_name ?? ""} ${primary.guest_last_name ?? ""}`.trim() ||
             "—"
           : "—";
-
         const dietary = attendees
           .flatMap((a) =>
             (a.dietary_flags ?? []).map((f) =>
@@ -341,31 +315,27 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
             ),
           )
           .filter((v, i, arr) => arr.indexOf(v) === i);
-
         const isCurrent = ["SEATED", "SERVICE"].includes(booking.status);
-        const isUpcoming = booking.status === "CONFIRMED";
+        const isGone = ["COMPLETED", "CANCELLED"].includes(booking.status);
 
         return (
           <div
             key={booking.id}
             style={{
               display: "grid",
-              gridTemplateColumns: "60px 8px 1fr",
-              gap: "0 14px",
+              gridTemplateColumns: "64px 8px 1fr",
+              gap: "0 12px",
               alignItems: "start",
-              opacity: ["COMPLETED", "CANCELLED"].includes(booking.status)
-                ? 0.4
-                : 1,
+              opacity: isGone ? 0.35 : 1,
             }}
           >
             <div
               style={{
                 textAlign: "right",
-                paddingTop: "10px",
-                fontSize: "13px",
+                paddingTop: "11px",
+                fontSize: "12px",
                 fontWeight: 600,
-                color: isCurrent ? "#18181b" : "#7a746c",
-                fontFamily: "var(--font-body)",
+                color: "var(--zinc-500)",
                 letterSpacing: "-0.01em",
               }}
             >
@@ -377,37 +347,34 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                paddingTop: "12px",
+                paddingTop: "13px",
               }}
             >
               <div
                 style={{
-                  width: "10px",
-                  height: "10px",
+                  width: "9px",
+                  height: "9px",
                   borderRadius: "50%",
-                  background: dot,
+                  background: sc.dot,
                   flexShrink: 0,
-                  boxShadow: isCurrent ? `0 0 0 3px ${dot}30` : "none",
                 }}
               />
             </div>
 
             <div
               style={{
-                background: isCurrent
-                  ? "rgba(255,255,255,0.98)"
-                  : "rgba(250,248,245,0.7)",
-                border: `1px solid ${isCurrent ? "rgba(220,213,204,0.9)" : "rgba(232,227,220,0.6)"}`,
-                borderRadius: "14px",
+                background: isCurrent ? "var(--bg-surface)" : "var(--zinc-50)",
+                border: "1px solid var(--zinc-200)",
+                borderRadius: "var(--radius-md)",
                 padding: "10px 14px",
-                marginBottom: "6px",
+                marginBottom: "4px",
               }}
             >
               <div
                 style={{
                   fontSize: "14px",
-                  fontWeight: 700,
-                  color: "#18181b",
+                  fontWeight: 600,
+                  color: "var(--zinc-900)",
                   fontFamily: "var(--font-display)",
                   marginBottom: "2px",
                   lineHeight: 1.2,
@@ -418,50 +385,32 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
               <div
                 style={{
                   fontSize: "12px",
-                  color: "#7a746c",
-                  fontFamily: "var(--font-body)",
+                  color: "var(--zinc-500)",
                   display: "flex",
                   alignItems: "center",
-                  gap: "8px",
+                  gap: "6px",
                   flexWrap: "wrap",
-                  marginBottom: "2px",
                 }}
               >
-                <span style={{ fontWeight: 600, color: "#5a544d" }}>
+                <span style={{ fontWeight: 600, color: "var(--zinc-700)" }}>
                   {room?.name ?? `Room ${booking.room_id}`}
                 </span>
-                <span style={{ color: "#ccc" }}>·</span>
-                <span style={{ color: "#b0a89e" }}>#{booking.id}</span>
-                <span style={{ color: "#ccc" }}>·</span>
+                <span style={{ color: "var(--zinc-300)" }}>·</span>
+                <span style={{ color: "var(--zinc-400)" }}>#{booking.id}</span>
+                <span style={{ color: "var(--zinc-300)" }}>·</span>
                 <span>
                   {booking.party_size} guest
                   {booking.party_size !== 1 ? "s" : ""}
                 </span>
-                <span style={{ color: "#ccc" }}>·</span>
+                <span style={{ color: "var(--zinc-300)" }}>·</span>
                 <span>
                   {MEAL_LABELS[booking.meal_type] ?? booking.meal_type}
                 </span>
-                {isUpcoming && (
+                {booking.status !== "DRAFT" && (
                   <>
-                    <span style={{ color: "#ccc" }}>·</span>
-                    <span style={{ color: "#3b82f6", fontWeight: 600 }}>
-                      Arriving
-                    </span>
-                  </>
-                )}
-                {booking.status === "SEATED" && (
-                  <>
-                    <span style={{ color: "#ccc" }}>·</span>
-                    <span style={{ color: "#22c55e", fontWeight: 600 }}>
-                      Seated
-                    </span>
-                  </>
-                )}
-                {booking.status === "SERVICE" && (
-                  <>
-                    <span style={{ color: "#ccc" }}>·</span>
-                    <span style={{ color: "#f59e0b", fontWeight: 600 }}>
-                      In Service
+                    <span style={{ color: "var(--zinc-300)" }}>·</span>
+                    <span style={{ color: "var(--accent)", fontWeight: 600 }}>
+                      {sc.label}
                     </span>
                   </>
                 )}
@@ -481,13 +430,12 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
                       key={d}
                       style={{
                         fontSize: "10px",
-                        fontWeight: 700,
+                        fontWeight: 600,
                         padding: "2px 8px",
-                        borderRadius: "999px",
-                        background: "rgba(254,243,199,0.9)",
-                        color: "#92400e",
-                        border: "1px solid rgba(245,196,83,0.4)",
-                        fontFamily: "var(--font-body)",
+                        borderRadius: "var(--radius-sm)",
+                        background: "var(--zinc-100)",
+                        color: "var(--zinc-600)",
+                        border: "1px solid var(--zinc-200)",
                       }}
                     >
                       {d}
@@ -499,11 +447,10 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
               {booking.notes && (
                 <div
                   style={{
-                    marginTop: "7px",
+                    marginTop: "6px",
                     fontSize: "12px",
-                    color: "#7a746c",
+                    color: "var(--zinc-400)",
                     fontStyle: "italic",
-                    fontFamily: "var(--font-body)",
                   }}
                 >
                   "{booking.notes}"
@@ -536,7 +483,7 @@ function RoomStatus({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
         gap: "10px",
       }}
     >
@@ -555,21 +502,19 @@ function RoomStatus({
             key={room.id}
             style={{
               padding: "14px 16px",
-              background: isEmpty
-                ? "rgba(248,245,241,0.6)"
-                : "rgba(255,255,255,0.97)",
-              border: `1px solid ${isEmpty ? "rgba(228,222,214,0.5)" : "rgba(220,213,204,0.9)"}`,
-              borderRadius: "14px",
-              opacity: isEmpty ? 0.6 : 1,
+              background: "var(--bg-surface)",
+              border: "1px solid var(--zinc-200)",
+              borderRadius: "var(--radius-md)",
+              opacity: isEmpty ? 0.5 : 1,
             }}
           >
             <div
               style={{
                 fontSize: "13px",
-                fontWeight: 700,
-                color: "#18181b",
+                fontWeight: 600,
+                color: "var(--zinc-900)",
                 fontFamily: "var(--font-display)",
-                marginBottom: "8px",
+                marginBottom: "6px",
               }}
             >
               {room.name}
@@ -577,8 +522,7 @@ function RoomStatus({
             <div
               style={{
                 fontSize: "11px",
-                color: "#9b948b",
-                fontFamily: "var(--font-body)",
+                color: "var(--zinc-400)",
                 marginBottom: "8px",
               }}
             >
@@ -586,8 +530,8 @@ function RoomStatus({
             </div>
             <div
               style={{
-                height: "5px",
-                background: "rgba(228,222,214,0.8)",
+                height: "4px",
+                background: "var(--zinc-200)",
                 borderRadius: "999px",
                 overflow: "hidden",
               }}
@@ -596,8 +540,7 @@ function RoomStatus({
                 style={{
                   height: "100%",
                   width: `${pct}%`,
-                  background:
-                    pct > 80 ? "#ef4444" : pct > 50 ? "#f59e0b" : "#22c55e",
+                  background: pct > 80 ? "var(--error)" : "var(--accent)",
                   borderRadius: "999px",
                   transition: "width 0.4s ease",
                 }}
@@ -619,7 +562,7 @@ function DietarySummary({ enriched }: { enriched: EnrichedBooking[] }) {
       <div
         style={{
           fontSize: "13px",
-          color: "#9b948b",
+          color: "var(--zinc-400)",
           fontStyle: "italic",
           padding: "8px 0",
         }}
@@ -630,7 +573,7 @@ function DietarySummary({ enriched }: { enriched: EnrichedBooking[] }) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {entries.map(([flag, names]) => (
         <div
           key={flag}
@@ -639,20 +582,19 @@ function DietarySummary({ enriched }: { enriched: EnrichedBooking[] }) {
             justifyContent: "space-between",
             alignItems: "center",
             padding: "10px 14px",
-            background: "rgba(254,243,199,0.5)",
-            border: "1px solid rgba(245,196,83,0.35)",
-            borderRadius: "12px",
+            background: "var(--zinc-50)",
+            border: "1px solid var(--zinc-200)",
+            borderRadius: "var(--radius-md)",
             gap: "16px",
           }}
         >
           <div
             style={{
-              fontSize: "13px",
+              fontSize: "12px",
               fontWeight: 700,
-              color: "#78350f",
-              fontFamily: "var(--font-body)",
+              color: "var(--zinc-700)",
               textTransform: "uppercase",
-              letterSpacing: "0.04em",
+              letterSpacing: "0.06em",
               flexShrink: 0,
             }}
           >
@@ -661,8 +603,7 @@ function DietarySummary({ enriched }: { enriched: EnrichedBooking[] }) {
           <div
             style={{
               fontSize: "12px",
-              color: "#92400e",
-              fontFamily: "var(--font-body)",
+              color: "var(--zinc-500)",
               textAlign: "right",
               lineHeight: 1.5,
             }}
@@ -683,7 +624,6 @@ function PreOrders({
   menuMap: Record<number, string>;
 }) {
   const itemMap: Record<string, number> = {};
-
   for (const e of enriched) {
     for (const order of e.orders) {
       const items = e.orderItems[order.id] ?? [];
@@ -693,7 +633,6 @@ function PreOrders({
       }
     }
   }
-
   const allItems = Object.entries(itemMap)
     .map(([name, qty]) => ({ name, qty }))
     .sort((a, b) => b.qty - a.qty);
@@ -703,7 +642,7 @@ function PreOrders({
       <div
         style={{
           fontSize: "13px",
-          color: "#9b948b",
+          color: "var(--zinc-400)",
           fontStyle: "italic",
           padding: "8px 0",
         }}
@@ -723,16 +662,15 @@ function PreOrders({
             justifyContent: "space-between",
             alignItems: "center",
             padding: "9px 14px",
-            background: "rgba(248,245,241,0.8)",
-            border: "1px solid rgba(228,222,214,0.7)",
-            borderRadius: "12px",
+            background: "var(--zinc-50)",
+            border: "1px solid var(--zinc-200)",
+            borderRadius: "var(--radius-md)",
           }}
         >
           <span
             style={{
               fontSize: "13px",
-              color: "#2b2824",
-              fontFamily: "var(--font-body)",
+              color: "var(--zinc-800)",
               fontWeight: 500,
             }}
           >
@@ -741,12 +679,12 @@ function PreOrders({
           <span
             style={{
               fontSize: "14px",
-              fontWeight: 800,
-              color: "#18181b",
+              fontWeight: 700,
+              color: "var(--zinc-900)",
               fontFamily: "var(--font-display)",
-              background: "rgba(255,255,255,0.9)",
-              border: "1px solid rgba(220,213,204,0.8)",
-              borderRadius: "8px",
+              background: "var(--bg-surface)",
+              border: "1px solid var(--zinc-200)",
+              borderRadius: "var(--radius-sm)",
               padding: "2px 10px",
               minWidth: "32px",
               textAlign: "center",
@@ -767,34 +705,38 @@ function CoverBreakdown({ enriched }: { enriched: EnrichedBooking[] }) {
     const meal = e.booking.meal_type;
     byMeal[meal] = (byMeal[meal] ?? 0) + e.booking.party_size;
   }
-
   const entries = Object.entries(byMeal);
   if (entries.length === 0) {
     return (
-      <div style={{ fontSize: "13px", color: "#9b948b", fontStyle: "italic" }}>
+      <div
+        style={{
+          fontSize: "13px",
+          color: "var(--zinc-400)",
+          fontStyle: "italic",
+        }}
+      >
         No covers today
       </div>
     );
   }
-
   return (
     <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
       {entries.map(([meal, count]) => (
         <div
           key={meal}
           style={{
-            padding: "12px 18px",
-            background: "rgba(248,245,241,0.8)",
-            border: "1px solid rgba(228,222,214,0.7)",
-            borderRadius: "14px",
+            padding: "12px 20px",
+            background: "var(--zinc-50)",
+            border: "1px solid var(--zinc-200)",
+            borderRadius: "var(--radius-md)",
             textAlign: "center",
           }}
         >
           <div
             style={{
-              fontSize: "26px",
-              fontWeight: 700,
-              color: "#18181b",
+              fontSize: "28px",
+              fontWeight: 600,
+              color: "var(--zinc-900)",
               fontFamily: "var(--font-display)",
               lineHeight: 1,
             }}
@@ -804,12 +746,11 @@ function CoverBreakdown({ enriched }: { enriched: EnrichedBooking[] }) {
           <div
             style={{
               fontSize: "10px",
-              fontWeight: 700,
-              color: "#9b948b",
+              fontWeight: 600,
+              color: "var(--zinc-400)",
               textTransform: "uppercase",
               letterSpacing: "0.1em",
               marginTop: "4px",
-              fontFamily: "var(--font-body)",
             }}
           >
             {MEAL_LABELS[meal] ?? meal}
@@ -817,36 +758,6 @@ function CoverBreakdown({ enriched }: { enriched: EnrichedBooking[] }) {
         </div>
       ))}
     </div>
-  );
-}
-
-function LiveDot() {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "5px",
-        fontSize: "10px",
-        fontWeight: 700,
-        color: "#22c55e",
-        fontFamily: "var(--font-body)",
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-      }}
-    >
-      <span
-        style={{
-          width: "7px",
-          height: "7px",
-          borderRadius: "50%",
-          background: "#22c55e",
-          display: "inline-block",
-          animation: "today-pulse 2s infinite",
-        }}
-      />
-      Live
-    </span>
   );
 }
 
@@ -873,19 +784,16 @@ export function TodayPage() {
         roomsApi.get<Room[]>("/rooms").then((r) => r.data),
         getActiveMenuItems(),
       ]);
-
       const mmap: Record<number, string> = {};
       menuItems.forEach((m: MenuItem) => {
         mmap[m.id] = m.name;
       });
       setMenuMap(mmap);
       setRooms(roomsData.filter((r: Room) => r.is_active));
-
       const todayBookings = bookingsData.filter(
         (b: Booking) =>
           b.booking_date === today && !["CANCELLED"].includes(b.status),
       );
-
       const enrichedData = await Promise.all(
         todayBookings.map(async (b: Booking) => {
           const [attendees, orders] = await Promise.allSettled([
@@ -894,7 +802,6 @@ export function TodayPage() {
           ]);
           const resolvedOrders =
             orders.status === "fulfilled" ? orders.value : [];
-
           const orderItems: Record<number, OrderItem[]> = {};
           await Promise.all(
             resolvedOrders
@@ -907,7 +814,6 @@ export function TodayPage() {
                 }
               }),
           );
-
           return {
             booking: b,
             attendees: attendees.status === "fulfilled" ? attendees.value : [],
@@ -917,7 +823,6 @@ export function TodayPage() {
           };
         }),
       );
-
       setEnriched(enrichedData);
       setLastRefresh(new Date());
     } catch (err) {
@@ -941,11 +846,9 @@ export function TodayPage() {
   const totalCovers = enriched
     .filter((e) => !["CANCELLED", "DRAFT"].includes(e.booking.status))
     .reduce((sum, e) => sum + e.booking.party_size, 0);
-  const currentPeriod = getMealPeriod();
   const preOrderEnriched = enriched.filter((e) =>
     e.orders.some((o) => !o.fired_at),
   );
-
   const filteredEnriched = enriched.filter((e) => {
     if (timelineFilter === "active")
       return ["SEATED", "SERVICE"].includes(e.booking.status);
@@ -967,40 +870,33 @@ export function TodayPage() {
       >
         <div
           style={{
-            width: "28px",
-            height: "28px",
+            width: "24px",
+            height: "24px",
             borderRadius: "50%",
-            border: "2px solid #e8e4de",
-            borderTopColor: "#18181b",
+            border: "2px solid var(--zinc-200)",
+            borderTopColor: "var(--zinc-900)",
             animation: "today-spin 0.8s linear infinite",
           }}
         />
-        <span
-          style={{
-            fontSize: "13px",
-            color: "#9b948b",
-            fontFamily: "var(--font-body)",
-          }}
-        >
+        <span style={{ fontSize: "13px", color: "var(--zinc-400)" }}>
           Loading today's service…
         </span>
       </div>
     );
   }
 
+  const roleLabel = isKitchen
+    ? "Kitchen"
+    : isWait
+      ? "Front of House"
+      : "Service";
+
   return (
     <>
       <style>{`
         @keyframes today-spin { to { transform: rotate(360deg); } }
-        @keyframes today-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(0.8); }
-        }
-        @keyframes today-fade-up {
-          from { opacity: 0; transform: translateY(12px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .today-section { animation: today-fade-up 0.4s ease both; }
+        @keyframes today-fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .today-section { animation: today-fade-up 0.35s ease both; }
         .today-section:nth-child(1) { animation-delay: 0.05s; }
         .today-section:nth-child(2) { animation-delay: 0.10s; }
         .today-section:nth-child(3) { animation-delay: 0.15s; }
@@ -1016,6 +912,7 @@ export function TodayPage() {
           maxWidth: "900px",
         }}
       >
+        {/* Header */}
         <div
           className="today-section"
           style={{
@@ -1030,16 +927,14 @@ export function TodayPage() {
             <div
               style={{
                 fontSize: "10px",
-                fontWeight: 800,
-                letterSpacing: "0.18em",
+                fontWeight: 600,
+                letterSpacing: "0.14em",
                 textTransform: "uppercase",
-                color: "var(--accent, #a38a64)",
+                color: "var(--accent)",
                 marginBottom: "6px",
-                fontFamily: "var(--font-body)",
               }}
             >
-              {isKitchen ? "Kitchen" : isWait ? "Front of House" : "Service"} ·
-              Daily Sheet
+              {roleLabel} · Daily Sheet
             </div>
             <h2
               style={{
@@ -1047,7 +942,7 @@ export function TodayPage() {
                 fontSize: "32px",
                 fontWeight: 500,
                 fontFamily: "var(--font-display)",
-                color: "#18181b",
+                color: "var(--zinc-900)",
                 letterSpacing: "-0.02em",
                 lineHeight: 1,
               }}
@@ -1055,13 +950,32 @@ export function TodayPage() {
               {getDayLabel()}
             </h2>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <LiveDot />
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span
+              style={{
+                width: "7px",
+                height: "7px",
+                borderRadius: "50%",
+                background: "var(--success)",
+                display: "inline-block",
+              }}
+            />
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 600,
+                color: "var(--success)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
+            >
+              Live
+            </span>
             <span
               style={{
                 fontSize: "11px",
-                color: "#9b948b",
-                fontFamily: "var(--font-body)",
+                color: "var(--zinc-400)",
+                marginLeft: "4px",
               }}
             >
               Updated{" "}
@@ -1073,6 +987,7 @@ export function TodayPage() {
           </div>
         </div>
 
+        {/* Stat pills */}
         <div
           className="today-section"
           style={{
@@ -1087,14 +1002,12 @@ export function TodayPage() {
           <FilterPill
             label="Active"
             value={active.length}
-            accent="#22c55e"
             selected={timelineFilter === "active"}
             onClick={() => setTimelineFilter("active")}
           />
           <FilterPill
             label="Arriving"
             value={upcoming.length}
-            accent="#3b82f6"
             selected={timelineFilter === "arriving"}
             onClick={() => setTimelineFilter("arriving")}
           />
@@ -1105,16 +1018,13 @@ export function TodayPage() {
             onClick={() => setTimelineFilter("all")}
           />
           <StatPill
-            label={MEAL_LABELS[currentPeriod] ?? "Period"}
+            label={MEAL_LABELS[getMealPeriod()] ?? "Period"}
             value={
-              currentPeriod === "LUNCH"
-                ? "🍽"
-                : currentPeriod === "DINNER"
-                  ? "🌙"
-                  : "🍸"
+              getMealPeriod().charAt(0) + getMealPeriod().slice(1).toLowerCase()
             }
           />
         </div>
+
         <DemoPanel />
 
         {isKitchen && !isAdmin && (
@@ -1164,32 +1074,7 @@ export function TodayPage() {
           </>
         )}
 
-        {isAdmin && (
-          <>
-            <Card className="today-section">
-              <Kicker>Arrival Order · {today}</Kicker>
-              <SectionTitle>Today's Bookings</SectionTitle>
-              <BookingTimeline enriched={filteredEnriched} />
-            </Card>
-            <Card className="today-section">
-              <Kicker>Current Floor Status</Kicker>
-              <SectionTitle>Rooms</SectionTitle>
-              <RoomStatus enriched={active} rooms={rooms} />
-            </Card>
-            <Card className="today-section">
-              <Kicker>Dietary Restrictions · All Guests Today</Kicker>
-              <SectionTitle>Dietary Flags</SectionTitle>
-              <DietarySummary enriched={enriched} />
-            </Card>
-            <Card className="today-section">
-              <Kicker>Unfired Pre-orders</Kicker>
-              <SectionTitle>Pre-orders</SectionTitle>
-              <PreOrders enriched={preOrderEnriched} menuMap={menuMap} />
-            </Card>
-          </>
-        )}
-
-        {isManager && (
+        {(isAdmin || isManager) && (
           <>
             <Card className="today-section">
               <Kicker>Arrival Order · {today}</Kicker>
