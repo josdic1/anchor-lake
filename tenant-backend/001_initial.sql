@@ -45,7 +45,7 @@ CREATE TYPE dietary_flag AS ENUM (
     'NUT_ALLERGY', 'PEANUT_ALLERGY', 'SESAME_ALLERGY', 'SHELLFISH_ALLERGY',
     'SOY_FREE', 'VEGAN', 'VEGETARIAN'
 );
-CREATE TYPE menu_category AS ENUM ('STARTER', 'MAIN', 'SIDE', 'DESSERT', 'DRINK', 'SPECIAL');
+CREATE TYPE menu_category AS ENUM ('STARTER', 'MAIN', 'SIDE', 'KIDS', 'DESSERT', 'DRINK', 'SPECIAL');
 CREATE TYPE audit_action AS ENUM (
     'BOOKING_CREATED', 'BOOKING_CONFIRMED', 'BOOKING_SEATED',
     'BOOKING_SERVICE_STARTED', 'BOOKING_COMPLETED', 'BOOKING_CANCELLED',
@@ -53,7 +53,8 @@ CREATE TYPE audit_action AS ENUM (
     'ATTENDEE_ADDED', 'ATTENDEE_REMOVED',
     'ORDER_CREATED', 'ORDER_FIRED', 'ORDER_KITCHEN_STATUS_CHANGE', 'ORDER_PRINT_TRIGGERED',
     'ROOM_BLOCKED', 'ROOM_UNBLOCKED',
-    'MENU_ITEM_CREATED', 'MENU_ITEM_UPDATED', 'MENU_ITEM_DEACTIVATED'
+    'MENU_ITEM_CREATED', 'MENU_ITEM_UPDATED', 'MENU_ITEM_DEACTIVATED',
+    'ORDER_ITEM_VOIDED', 'BOOKING_STATUS_CHANGE'
 );
 
 -- =============================================================================
@@ -75,8 +76,8 @@ CREATE TABLE tenant_config (
 
 INSERT INTO tenant_config (name, primary_color, logo_url, tagline, features)
 VALUES (
-    'Anchor Lake',
-    '#eb5638',
+    'My Club',
+    '#a38a64',
     '',
     'Member Portal',
     '{"show_demo_login": true, "show_kitchen_board": true, "show_reports": true, "allow_member_booking": true, "allow_preorders": true, "show_dietary_flags": true}'::jsonb
@@ -94,6 +95,7 @@ CREATE TABLE users (
     hashed_password       TEXT NOT NULL,
     role                  user_role NOT NULL DEFAULT 'member',
     member_number         VARCHAR(50) UNIQUE,
+    sub_role              VARCHAR(50),
     force_password_change BOOLEAN NOT NULL DEFAULT FALSE,
     is_active             BOOLEAN NOT NULL DEFAULT TRUE,
     notes                 TEXT,
@@ -111,8 +113,9 @@ CREATE TABLE members (
     first_name    VARCHAR(100) NOT NULL,
     last_name     VARCHAR(100) NOT NULL,
     relation      member_relation NOT NULL DEFAULT 'PRIMARY',
-    dietary_flags dietary_flag[] DEFAULT '{}',
-    notes         TEXT,
+    dietary_flags      dietary_flag[] DEFAULT '{}',
+    dietary_other_note TEXT,
+    notes              TEXT,
     is_active     BOOLEAN NOT NULL DEFAULT TRUE,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -198,8 +201,9 @@ CREATE TABLE booking_attendees (
     guest_first_name VARCHAR(100),
     guest_last_name  VARCHAR(100),
     is_member_guest  BOOLEAN NOT NULL DEFAULT FALSE,
-    dietary_flags    dietary_flag[] DEFAULT '{}',
-    notes            TEXT,
+    dietary_flags        dietary_flag[] DEFAULT '{}',
+    dietary_other_note   TEXT,
+    notes                TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT attendee_identity_check CHECK (
@@ -257,6 +261,7 @@ CREATE TABLE order_items (
     unit_price           NUMERIC(10,2) NOT NULL,
     special_instructions TEXT,
     modifier_ids         INT[] DEFAULT '{}',
+    voided               BOOLEAN NOT NULL DEFAULT FALSE,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT quantity_positive CHECK (quantity > 0)
