@@ -160,10 +160,7 @@ export function OrderEntryDrawer({
       setMenu(menuData);
 
       // Find an existing unfired order and restore it
-      const openOrder =
-        existingOrders.find(
-          (o) => o.fired_at === null && o.kitchen_status === "INCOMING",
-        ) ?? existingOrders[0];
+      const openOrder = existingOrders.find((o) => o.fired_at === null) ?? null;
       if (openOrder) {
         orderIdRef.current = openOrder.id;
         const existingItems = await getOrderItems(openOrder.id);
@@ -194,6 +191,8 @@ export function OrderEntryDrawer({
           })),
         );
       }
+      // If no open order exists, orderIdRef stays null and a new one
+      // will be created automatically when the first item is added.
 
       setLoading(false);
     }

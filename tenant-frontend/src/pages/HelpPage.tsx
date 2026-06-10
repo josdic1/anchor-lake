@@ -484,83 +484,83 @@ const CATEGORY_STYLE: Record<string, { bg: string; color: string }> = {
 
 // ─── Video Card ───────────────────────────────────────────────────────────────
 
-function VideoCard({
-  title,
-  subtitle,
-  src,
-}: {
-  title: string;
-  subtitle: string;
-  src: string;
-}) {
-  return (
-    <div
-      style={{
-        border: "1px solid var(--zinc-150, #f0ede8)",
-        borderRadius: "16px",
-        overflow: "hidden",
-        background: "var(--bg-surface)",
-      }}
-    >
-      <video
-        src={src}
-        controls
-        playsInline
-        style={{
-          width: "100%",
-          display: "block",
-          maxHeight: "400px",
-          background: "#000",
-        }}
-      />
-      <div
-        style={{
-          padding: "12px 16px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: "14px",
-              fontWeight: 600,
-              color: "var(--zinc-800)",
-              fontFamily: "var(--font-body)",
-            }}
-          >
-            {title}
-          </div>
-          <div
-            style={{
-              fontSize: "12px",
-              color: "var(--zinc-400)",
-              fontFamily: "var(--font-body)",
-              marginTop: "2px",
-            }}
-          >
-            {subtitle}
-          </div>
-        </div>
-        <span
-          style={{
-            fontSize: "10px",
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: "var(--accent)",
-            background: "var(--accent-light)",
-            padding: "3px 10px",
-            borderRadius: "100px",
-          }}
-        >
-          Video
-        </span>
-      </div>
-    </div>
-  );
-}
+// function VideoCard({
+//   title,
+//   subtitle,
+//   src,
+// }: {
+//   title: string;
+//   subtitle: string;
+//   src: string;
+// }) {
+//   return (
+//     <div
+//       style={{
+//         border: "1px solid var(--zinc-150, #f0ede8)",
+//         borderRadius: "16px",
+//         overflow: "hidden",
+//         background: "var(--bg-surface)",
+//       }}
+//     >
+//       <video
+//         src={src}
+//         controls
+//         playsInline
+//         style={{
+//           width: "100%",
+//           display: "block",
+//           maxHeight: "400px",
+//           background: "#000",
+//         }}
+//       />
+//       <div
+//         style={{
+//           padding: "12px 16px",
+//           display: "flex",
+//           justifyContent: "space-between",
+//           alignItems: "center",
+//         }}
+//       >
+//         <div>
+//           <div
+//             style={{
+//               fontSize: "14px",
+//               fontWeight: 600,
+//               color: "var(--zinc-800)",
+//               fontFamily: "var(--font-body)",
+//             }}
+//           >
+//             {title}
+//           </div>
+//           <div
+//             style={{
+//               fontSize: "12px",
+//               color: "var(--zinc-400)",
+//               fontFamily: "var(--font-body)",
+//               marginTop: "2px",
+//             }}
+//           >
+//             {subtitle}
+//           </div>
+//         </div>
+//         <span
+//           style={{
+//             fontSize: "10px",
+//             fontWeight: 700,
+//             letterSpacing: "0.08em",
+//             textTransform: "uppercase",
+//             color: "var(--accent)",
+//             background: "var(--accent-light)",
+//             padding: "3px 10px",
+//             borderRadius: "100px",
+//           }}
+//         >
+//           Video
+//         </span>
+//       </div>
+//     </div>
+//   );
+// }
 
 // ─── Topic Card ───────────────────────────────────────────────────────────────
 
@@ -849,7 +849,7 @@ export function HelpPage() {
       </div>
 
       {/* ── Training Videos ── */}
-      <div style={{ marginBottom: "2.5rem" }}>
+      {/* <div style={{ marginBottom: "2.5rem" }}>
         <div
           style={{
             fontSize: "11px",
@@ -869,7 +869,7 @@ export function HelpPage() {
             src="https://res.cloudinary.com/dtgtpye2w/video/upload/v1778598308/video_walkthrough_WAITSTAFF_e5ccyk.mov"
           />
         </div>
-      </div>
+      </div> */}
 
       {/* Search */}
       <div style={{ position: "relative", marginBottom: "1.25rem" }}>

@@ -39,13 +39,6 @@ function getDayLabel() {
   });
 }
 
-function getMealPeriod(): string {
-  const h = new Date().getHours();
-  if (h < 15) return "LUNCH";
-  if (h < 19) return "DINNER";
-  return "AFTERHOURS";
-}
-
 const MEAL_LABELS: Record<string, string> = {
   LUNCH: "Lunch",
   DINNER: "Dinner",
@@ -53,13 +46,32 @@ const MEAL_LABELS: Record<string, string> = {
   SPECIAL_EVENT: "Special Event",
 };
 
-const STATUS_COLORS: Record<string, { dot: string; label: string }> = {
-  CONFIRMED: { dot: "var(--zinc-400)", label: "Arriving" },
-  SEATED: { dot: "var(--zinc-600)", label: "Seated" },
-  SERVICE: { dot: "var(--accent)", label: "In Service" },
-  COMPLETED: { dot: "var(--zinc-300)", label: "Completed" },
-  CANCELLED: { dot: "var(--zinc-300)", label: "Cancelled" },
-  DRAFT: { dot: "var(--zinc-200)", label: "Draft" },
+const STATUS_COLORS: Record<
+  string,
+  { dot: string; label: string; color: string }
+> = {
+  CONFIRMED: {
+    dot: "var(--zinc-300)",
+    label: "Arriving",
+    color: "var(--zinc-500)",
+  },
+  SEATED: { dot: "var(--zinc-500)", label: "Seated", color: "var(--zinc-600)" },
+  SERVICE: {
+    dot: "var(--accent)",
+    label: "In Service",
+    color: "var(--accent)",
+  },
+  COMPLETED: {
+    dot: "var(--zinc-200)",
+    label: "Completed",
+    color: "var(--zinc-400)",
+  },
+  CANCELLED: {
+    dot: "var(--zinc-200)",
+    label: "Cancelled",
+    color: "var(--zinc-400)",
+  },
+  DRAFT: { dot: "var(--zinc-200)", label: "Draft", color: "var(--zinc-300)" },
 };
 
 function collectDietary(enriched: EnrichedBooking[]): Record<string, string[]> {
@@ -154,9 +166,6 @@ function SectionTitle({
         <a
           href={href}
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
             padding: "6px 16px",
             borderRadius: "var(--radius-sm)",
             background: "var(--zinc-900)",
@@ -181,16 +190,12 @@ function StatPill({ label, value }: { label: string; value: string | number }) {
         flexDirection: "column",
         alignItems: "center",
         padding: "14px 20px",
-        background: "var(--bg-surface)",
-        border: "1px solid var(--zinc-200)",
-        borderRadius: "var(--radius-md)",
         minWidth: "80px",
-        boxShadow: "var(--shadow-sm)",
       }}
     >
       <span
         style={{
-          fontSize: "28px",
+          fontSize: "26px",
           fontWeight: 600,
           color: "var(--zinc-900)",
           lineHeight: 1,
@@ -246,7 +251,7 @@ function FilterPill({
     >
       <span
         style={{
-          fontSize: "28px",
+          fontSize: "26px",
           fontWeight: 600,
           color: selected ? "var(--bg-surface)" : "var(--zinc-900)",
           lineHeight: 1,
@@ -284,7 +289,7 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
         style={{
           padding: "32px",
           textAlign: "center",
-          fontSize: "14px",
+          fontSize: "13px",
           color: "var(--zinc-400)",
           fontStyle: "italic",
         }}
@@ -295,7 +300,7 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {sorted.map((e) => {
         const { booking, attendees, room } = e;
         const sc = STATUS_COLORS[booking.status] ?? STATUS_COLORS.DRAFT;
@@ -323,37 +328,40 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
             key={booking.id}
             style={{
               display: "grid",
-              gridTemplateColumns: "64px 8px 1fr",
+              gridTemplateColumns: "56px 6px 1fr",
               gap: "0 12px",
               alignItems: "start",
-              opacity: isGone ? 0.35 : 1,
+              opacity: isGone ? 0.3 : 1,
             }}
           >
+            {/* Time */}
             <div
               style={{
                 textAlign: "right",
-                paddingTop: "11px",
-                fontSize: "12px",
-                fontWeight: 600,
-                color: "var(--zinc-500)",
-                letterSpacing: "-0.01em",
+                paddingTop: "10px",
+                fontSize: "11px",
+                fontWeight: 500,
+                color: "var(--zinc-400)",
+                letterSpacing: "0.01em",
+                fontVariantNumeric: "tabular-nums",
               }}
             >
               {fmt(booking.estimated_arrival)}
             </div>
 
+            {/* Dot */}
             <div
               style={{
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                paddingTop: "13px",
+                paddingTop: "12px",
               }}
             >
               <div
                 style={{
-                  width: "9px",
-                  height: "9px",
+                  width: "8px",
+                  height: "8px",
                   borderRadius: "50%",
                   background: sc.dot,
                   flexShrink: 0,
@@ -361,65 +369,64 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
               />
             </div>
 
+            {/* Card */}
             <div
               style={{
                 background: isCurrent ? "var(--bg-surface)" : "var(--zinc-50)",
                 border: "1px solid var(--zinc-200)",
                 borderRadius: "var(--radius-md)",
-                padding: "10px 14px",
-                marginBottom: "4px",
+                padding: "9px 13px",
+                marginBottom: "2px",
               }}
             >
+              {/* Name + status on one line */}
               <div
                 style={{
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  color: "var(--zinc-900)",
-                  fontFamily: "var(--font-display)",
-                  marginBottom: "2px",
-                  lineHeight: 1.2,
+                  display: "flex",
+                  alignItems: "baseline",
+                  justifyContent: "space-between",
+                  gap: "8px",
                 }}
               >
-                {memberName}
+                <span
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "var(--zinc-900)",
+                  }}
+                >
+                  {memberName}
+                </span>
+                {booking.status !== "DRAFT" && (
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: sc.color,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {sc.label}
+                  </span>
+                )}
               </div>
+              {/* Meta line — one font, one size, one weight */}
               <div
                 style={{
                   fontSize: "12px",
-                  color: "var(--zinc-500)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  flexWrap: "wrap",
+                  color: "var(--zinc-400)",
+                  marginTop: "2px",
                 }}
               >
-                <span style={{ fontWeight: 600, color: "var(--zinc-700)" }}>
-                  {room?.name ?? `Room ${booking.room_id}`}
-                </span>
-                <span style={{ color: "var(--zinc-300)" }}>·</span>
-                <span style={{ color: "var(--zinc-400)" }}>#{booking.id}</span>
-                <span style={{ color: "var(--zinc-300)" }}>·</span>
-                <span>
-                  {booking.party_size} guest
-                  {booking.party_size !== 1 ? "s" : ""}
-                </span>
-                <span style={{ color: "var(--zinc-300)" }}>·</span>
-                <span>
-                  {MEAL_LABELS[booking.meal_type] ?? booking.meal_type}
-                </span>
-                {booking.status !== "DRAFT" && (
-                  <>
-                    <span style={{ color: "var(--zinc-300)" }}>·</span>
-                    <span style={{ color: "var(--accent)", fontWeight: 600 }}>
-                      {sc.label}
-                    </span>
-                  </>
-                )}
+                {room?.name ?? `Room ${booking.room_id}`} · #{booking.id} ·{" "}
+                {booking.party_size} guest{booking.party_size !== 1 ? "s" : ""}{" "}
+                · {MEAL_LABELS[booking.meal_type] ?? booking.meal_type}
               </div>
 
               {dietary.length > 0 && (
                 <div
                   style={{
-                    marginTop: "8px",
+                    marginTop: "6px",
                     display: "flex",
                     flexWrap: "wrap",
                     gap: "4px",
@@ -431,7 +438,7 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
                       style={{
                         fontSize: "10px",
                         fontWeight: 600,
-                        padding: "2px 8px",
+                        padding: "1px 7px",
                         borderRadius: "var(--radius-sm)",
                         background: "var(--zinc-100)",
                         color: "var(--zinc-600)",
@@ -447,8 +454,8 @@ function BookingTimeline({ enriched }: { enriched: EnrichedBooking[] }) {
               {booking.notes && (
                 <div
                   style={{
-                    marginTop: "6px",
-                    fontSize: "12px",
+                    marginTop: "5px",
+                    fontSize: "11px",
                     color: "var(--zinc-400)",
                     fontStyle: "italic",
                   }}
@@ -496,7 +503,6 @@ function RoomStatus({
         const pct =
           room.capacity > 0 ? Math.min(100, (seated / room.capacity) * 100) : 0;
         const isEmpty = active.length === 0;
-
         return (
           <div
             key={room.id}
@@ -512,9 +518,8 @@ function RoomStatus({
               style={{
                 fontSize: "13px",
                 fontWeight: 600,
-                color: "var(--zinc-900)",
-                fontFamily: "var(--font-display)",
-                marginBottom: "6px",
+                color: "var(--zinc-800)",
+                marginBottom: "5px",
               }}
             >
               {room.name}
@@ -530,7 +535,7 @@ function RoomStatus({
             </div>
             <div
               style={{
-                height: "4px",
+                height: "3px",
                 background: "var(--zinc-200)",
                 borderRadius: "999px",
                 overflow: "hidden",
@@ -556,7 +561,6 @@ function RoomStatus({
 function DietarySummary({ enriched }: { enriched: EnrichedBooking[] }) {
   const dietary = collectDietary(enriched);
   const entries = Object.entries(dietary);
-
   if (entries.length === 0) {
     return (
       <div
@@ -571,7 +575,6 @@ function DietarySummary({ enriched }: { enriched: EnrichedBooking[] }) {
       </div>
     );
   }
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {entries.map(([flag, names]) => (
@@ -581,7 +584,7 @@ function DietarySummary({ enriched }: { enriched: EnrichedBooking[] }) {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "10px 14px",
+            padding: "9px 13px",
             background: "var(--zinc-50)",
             border: "1px solid var(--zinc-200)",
             borderRadius: "var(--radius-md)",
@@ -590,7 +593,7 @@ function DietarySummary({ enriched }: { enriched: EnrichedBooking[] }) {
         >
           <div
             style={{
-              fontSize: "12px",
+              fontSize: "11px",
               fontWeight: 700,
               color: "var(--zinc-700)",
               textTransform: "uppercase",
@@ -636,7 +639,6 @@ function PreOrders({
   const allItems = Object.entries(itemMap)
     .map(([name, qty]) => ({ name, qty }))
     .sort((a, b) => b.qty - a.qty);
-
   if (allItems.length === 0) {
     return (
       <div
@@ -651,7 +653,6 @@ function PreOrders({
       </div>
     );
   }
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {allItems.map((item) => (
@@ -661,7 +662,7 @@ function PreOrders({
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "9px 14px",
+            padding: "9px 13px",
             background: "var(--zinc-50)",
             border: "1px solid var(--zinc-200)",
             borderRadius: "var(--radius-md)",
@@ -670,7 +671,7 @@ function PreOrders({
           <span
             style={{
               fontSize: "13px",
-              color: "var(--zinc-800)",
+              color: "var(--zinc-700)",
               fontWeight: 500,
             }}
           >
@@ -678,14 +679,13 @@ function PreOrders({
           </span>
           <span
             style={{
-              fontSize: "14px",
+              fontSize: "13px",
               fontWeight: 700,
               color: "var(--zinc-900)",
-              fontFamily: "var(--font-display)",
               background: "var(--bg-surface)",
               border: "1px solid var(--zinc-200)",
               borderRadius: "var(--radius-sm)",
-              padding: "2px 10px",
+              padding: "1px 10px",
               minWidth: "32px",
               textAlign: "center",
             }}
@@ -702,8 +702,8 @@ function CoverBreakdown({ enriched }: { enriched: EnrichedBooking[] }) {
   const byMeal: Record<string, number> = {};
   for (const e of enriched) {
     if (["CANCELLED", "DRAFT"].includes(e.booking.status)) continue;
-    const meal = e.booking.meal_type;
-    byMeal[meal] = (byMeal[meal] ?? 0) + e.booking.party_size;
+    byMeal[e.booking.meal_type] =
+      (byMeal[e.booking.meal_type] ?? 0) + e.booking.party_size;
   }
   const entries = Object.entries(byMeal);
   if (entries.length === 0) {
@@ -734,7 +734,7 @@ function CoverBreakdown({ enriched }: { enriched: EnrichedBooking[] }) {
         >
           <div
             style={{
-              fontSize: "28px",
+              fontSize: "26px",
               fontWeight: 600,
               color: "var(--zinc-900)",
               fontFamily: "var(--font-display)",
@@ -855,53 +855,55 @@ export function TodayPage() {
     if (timelineFilter === "arriving") return e.booking.status === "CONFIRMED";
     return true;
   });
-
-  if (loading) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "60vh",
-          gap: "12px",
-          flexDirection: "column",
-        }}
-      >
-        <div
-          style={{
-            width: "24px",
-            height: "24px",
-            borderRadius: "50%",
-            border: "2px solid var(--zinc-200)",
-            borderTopColor: "var(--zinc-900)",
-            animation: "today-spin 0.8s linear infinite",
-          }}
-        />
-        <span style={{ fontSize: "13px", color: "var(--zinc-400)" }}>
-          Loading today's service…
-        </span>
-      </div>
-    );
-  }
-
   const roleLabel = isKitchen
     ? "Kitchen"
     : isWait
       ? "Front of House"
       : "Service";
 
+  if (loading) {
+    return (
+      <>
+        <style>{`@keyframes today-spin { to { transform: rotate(360deg); } }`}</style>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "60vh",
+            gap: "12px",
+            flexDirection: "column",
+          }}
+        >
+          <div
+            style={{
+              width: "22px",
+              height: "22px",
+              borderRadius: "50%",
+              border: "2px solid var(--zinc-200)",
+              borderTopColor: "var(--zinc-700)",
+              animation: "today-spin 0.8s linear infinite",
+            }}
+          />
+          <span style={{ fontSize: "13px", color: "var(--zinc-400)" }}>
+            Loading today's service…
+          </span>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <style>{`
         @keyframes today-spin { to { transform: rotate(360deg); } }
-        @keyframes today-fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .today-section { animation: today-fade-up 0.35s ease both; }
-        .today-section:nth-child(1) { animation-delay: 0.05s; }
-        .today-section:nth-child(2) { animation-delay: 0.10s; }
-        .today-section:nth-child(3) { animation-delay: 0.15s; }
-        .today-section:nth-child(4) { animation-delay: 0.20s; }
-        .today-section:nth-child(5) { animation-delay: 0.25s; }
+        @keyframes today-fade-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .today-section { animation: today-fade-up 0.3s ease both; }
+        .today-section:nth-child(1) { animation-delay: 0.04s; }
+        .today-section:nth-child(2) { animation-delay: 0.08s; }
+        .today-section:nth-child(3) { animation-delay: 0.12s; }
+        .today-section:nth-child(4) { animation-delay: 0.16s; }
+        .today-section:nth-child(5) { animation-delay: 0.20s; }
       `}</style>
 
       <div
@@ -939,7 +941,7 @@ export function TodayPage() {
             <h2
               style={{
                 margin: 0,
-                fontSize: "32px",
+                fontSize: "30px",
                 fontWeight: 500,
                 fontFamily: "var(--font-display)",
                 color: "var(--zinc-900)",
@@ -950,11 +952,11 @@ export function TodayPage() {
               {getDayLabel()}
             </h2>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span
               style={{
-                width: "7px",
-                height: "7px",
+                width: "6px",
+                height: "6px",
                 borderRadius: "50%",
                 background: "var(--success)",
                 display: "inline-block",
@@ -987,18 +989,27 @@ export function TodayPage() {
           </div>
         </div>
 
-        {/* Stat pills */}
+        {/* Stats + filters */}
         <div
           className="today-section"
           style={{
             display: "flex",
-            gap: "10px",
+            gap: "4px",
             flexWrap: "wrap",
             alignItems: "stretch",
+            borderBottom: "1px solid var(--zinc-200)",
+            paddingBottom: "16px",
           }}
         >
           <StatPill label="Covers" value={totalCovers} />
           <StatPill label="Bookings" value={enriched.length} />
+          <div
+            style={{
+              width: "1px",
+              background: "var(--zinc-200)",
+              margin: "8px 10px",
+            }}
+          />
           <FilterPill
             label="Active"
             value={active.length}
@@ -1016,12 +1027,6 @@ export function TodayPage() {
             value={enriched.length}
             selected={timelineFilter === "all"}
             onClick={() => setTimelineFilter("all")}
-          />
-          <StatPill
-            label={MEAL_LABELS[getMealPeriod()] ?? "Period"}
-            value={
-              getMealPeriod().charAt(0) + getMealPeriod().slice(1).toLowerCase()
-            }
           />
         </div>
 

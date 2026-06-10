@@ -27,8 +27,6 @@ import type { Order, OrderItem } from "../api/orders";
 import type { MenuItem } from "../api/menu";
 import { OrderEntryDrawer } from "../components/bookings/OrderEntryDrawer";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface EnrichedBooking {
   booking: Booking;
   attendees: Attendee[];
@@ -44,8 +42,6 @@ interface Toast {
   roomName: string;
   message: string;
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const ACTIVE_STATUSES = ["CONFIRMED", "SEATED", "SERVICE"];
 
@@ -106,8 +102,6 @@ const ACTION_MAP: Record<string, string> = {
   CANCELLED: "cancel",
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function getMemberName(attendees: Attendee[]): string {
   if (!attendees.length) return "—";
   const primary =
@@ -149,13 +143,10 @@ function minutesUntil(date: string, time?: string | null) {
 function formatTime(t?: string | null) {
   return t?.slice(0, 5) ?? "—";
 }
-
 function formatDuration(mins: number) {
   if (mins < 60) return `${mins}m`;
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
-
-// ─── Toast Stack ──────────────────────────────────────────────────────────────
 
 function ToastStack({
   toasts,
@@ -203,8 +194,6 @@ function ToastStack({
     </div>
   );
 }
-
-// ─── Upcoming Strip ───────────────────────────────────────────────────────────
 
 function UpcomingStrip({
   enriched,
@@ -258,8 +247,6 @@ function UpcomingStrip({
     </div>
   );
 }
-
-// ─── Room Card ────────────────────────────────────────────────────────────────
 
 function RoomCard({
   room,
@@ -387,8 +374,6 @@ function RoomCard({
   );
 }
 
-// ─── Detail Drawer ────────────────────────────────────────────────────────────
-
 function DetailDrawer({
   enriched,
   menuMap,
@@ -413,18 +398,11 @@ function DetailDrawer({
   const cfg = STATUS_CFG[booking.status] ?? STATUS_CFG.CONFIRMED;
   const dietary = getDietaryLabel(attendees);
   const canOrder = ["SEATED", "SERVICE"].includes(booking.status);
-  const activeOrders = orders.filter((o) => o.kitchen_status !== "SERVED");
   const seatedMins = minutesSince(booking.seated_at ?? booking.service_at);
 
-  // Next possible status actions
   const STATUS_NEXT: Record<
     string,
-    {
-      action: string;
-      label: string;
-      style: "primary" | "ghost";
-      adminOnly?: boolean;
-    }[]
+    { action: string; label: string; style: "primary" | "ghost" }[]
   > = {
     CONFIRMED: [{ action: "SEATED", label: "Seat Party", style: "primary" }],
     SEATED: [{ action: "SERVICE", label: "Start Service", style: "primary" }],
@@ -432,7 +410,10 @@ function DetailDrawer({
   };
   const nextActions = STATUS_NEXT[booking.status] ?? [];
 
+  // Reload items whenever orders change
+  const orderKey = orders.map((o) => o.id).join(",");
   useEffect(() => {
+    if (!orders.length) return;
     const load = async () => {
       const entries = await Promise.all(
         orders.map(async (o) => {
@@ -446,7 +427,7 @@ function DetailDrawer({
       setItemsMap(Object.fromEntries(entries));
     };
     load();
-  }, [orders]);
+  }, [orderKey]);
 
   async function handleFire(orderId: number) {
     setFiringId(orderId);
@@ -486,13 +467,9 @@ function DetailDrawer({
         (i) => i.id !== itemId,
       );
       setItemsMap((prev) => ({ ...prev, [orderId]: remaining }));
-
-      // If order is now empty and unfired, delete the shell
       const order = orders.find((o) => o.id === orderId);
-      if (remaining.length === 0 && order && order.fired_at === null) {
+      if (remaining.length === 0 && order && order.fired_at === null)
         await cancelOrder(orderId);
-      }
-
       onChanged();
     } catch (err) {
       console.error("Failed to delete item", err);
@@ -554,7 +531,6 @@ function DetailDrawer({
       </div>
 
       <div className="s360-drawer__body">
-        {/* Status Actions */}
         {nextActions.length > 0 && (
           <div className="s360-action-row">
             {nextActions.map((a) => (
@@ -624,20 +600,26 @@ function DetailDrawer({
             )}
           </div>
 
-          {activeOrders.length === 0 ? (
-            <div className="s360-empty-orders">No active orders</div>
+          {orders.length === 0 ? (
+            <div className="s360-empty-orders">No orders yet</div>
           ) : (
             <div className="s360-order-list">
-              {activeOrders.map((o) => {
+              {orders.map((o) => {
                 const items = itemsMap[o.id] ?? [];
-                const kCfg = KITCHEN_CFG[o.kitchen_status];
+                const kCfg =
+                  KITCHEN_CFG[o.kitchen_status] ?? KITCHEN_CFG.INCOMING;
                 const canFire =
-                  o.kitchen_status === "INCOMING" && o.fired_at === null;
+                  o.kitchen_status === "INCOMING" &&
+                  o.fired_at === null &&
+                  items.length > 0;
                 const canServe = o.kitchen_status === "READY";
+                const isServed = o.kitchen_status === "SERVED";
+
                 return (
                   <div
                     key={o.id}
                     className={`s360-order-card ${o.kitchen_status === "READY" ? "s360-order-card--ready" : ""}`}
+                    style={{ opacity: isServed ? 0.5 : 1 }}
                   >
                     <div className="s360-order-card__header">
                       <span className="s360-order-card__id">Order #{o.id}</span>
@@ -692,8 +674,20 @@ function DetailDrawer({
                         ))}
                       </div>
                     )}
+                    {items.length === 0 && !isServed && (
+                      <div
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "11px",
+                          color: "var(--zinc-400)",
+                          fontStyle: "italic",
+                        }}
+                      >
+                        Loading items...
+                      </div>
+                    )}
                     <div className="s360-order-card__actions">
-                      {canFire && items.length > 0 && (
+                      {canFire && (
                         <button
                           className="s360-fire-btn"
                           disabled={firingId === o.id}
@@ -728,7 +722,6 @@ function DetailDrawer({
                           )}
                         </button>
                       )}
-
                       {canServe && (
                         <button
                           className="s360-serve-btn"
@@ -766,8 +759,6 @@ function DetailDrawer({
     </div>
   );
 }
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function StaffPage360() {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -825,7 +816,6 @@ export function StaffPage360() {
         }),
       );
 
-      // Detect newly READY orders → toast
       const nowReady = new Set<number>();
       enrichedData.forEach((e) =>
         e.orders
@@ -973,738 +963,120 @@ export function StaffPage360() {
       />
 
       <style>{`
-        .s360-shell {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          min-height: 0;
-        }
-
-        .s360-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 16px;
-          flex-wrap: wrap;
-        }
-
-        .s360-header__kicker {
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: var(--accent, #a38a64);
-          margin-bottom: 4px;
-        }
-
-        .s360-header__title {
-          margin: 0;
-          font-family: var(--font-display);
-          font-size: 32px;
-          font-weight: 500;
-          letter-spacing: -0.02em;
-          color: #18181b;
-          line-height: 1;
-        }
-
-        .s360-header__stats {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-
-        .s360-stat {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 8px 14px;
-          border-radius: 14px;
-          border: 1px solid rgba(223,216,207,0.95);
-          background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(249,247,244,0.98) 100%);
-          box-shadow: 0 6px 16px rgba(0,0,0,0.04);
-        }
-
-        .s360-stat--ready {
-          background: rgba(220,252,231,0.85);
-          border-color: rgba(134,239,172,0.6);
-          color: #166534;
-          animation: s360-pulse 2s infinite;
-        }
-
-        .s360-stat--kitchen {
-          background: rgba(254,243,199,0.85);
-          border-color: rgba(252,211,77,0.6);
-          color: #92400e;
-        }
-
-        @keyframes s360-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.25); }
-          50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
-        }
-
-        .s360-stat__val {
-          font-size: 18px;
-          font-weight: 800;
-          color: inherit;
-          line-height: 1;
-        }
-
-        .s360-stat__label {
-          font-size: 10px;
-          font-weight: 700;
-          color: inherit;
-          opacity: 0.7;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-        }
-
-        .s360-refresh-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          height: 38px;
-          padding: 0 14px;
-          border-radius: 999px;
-          border: 1px solid rgba(223,216,207,0.95);
-          background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(249,247,244,0.98) 100%);
-          color: #5f5a53;
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          box-shadow: 0 6px 16px rgba(0,0,0,0.04);
-        }
-
-        .s360-upcoming {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 16px;
-          border-radius: 16px;
-          border: 1px solid rgba(223,216,207,0.95);
-          background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(249,247,244,0.96) 100%);
-          box-shadow: 0 8px 20px rgba(0,0,0,0.04);
-          overflow: hidden;
-        }
-
-        .s360-upcoming__label {
-          display: flex;
-          align-items: center;
-          gap: 5px;
-          font-size: 10px;
-          font-weight: 700;
-          color: #9b948b;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          white-space: nowrap;
-          flex-shrink: 0;
-        }
-
-        .s360-upcoming__scroll {
-          display: flex;
-          gap: 8px;
-          overflow-x: auto;
-          scrollbar-width: none;
-          flex: 1;
-        }
-
+        .s360-shell { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+        .s360-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .s360-header__kicker { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent, #a38a64); margin-bottom: 4px; }
+        .s360-header__title { margin: 0; font-family: var(--font-display); font-size: 32px; font-weight: 500; letter-spacing: -0.02em; color: var(--zinc-900); line-height: 1; }
+        .s360-header__stats { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .s360-stat { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 14px; border: 1px solid var(--zinc-200); background: var(--bg-surface); box-shadow: var(--shadow-sm); }
+        .s360-stat--ready { background: rgba(220,252,231,0.85); border-color: rgba(134,239,172,0.6); color: #166534; animation: s360-pulse 2s infinite; }
+        .s360-stat--kitchen { background: rgba(254,243,199,0.85); border-color: rgba(252,211,77,0.6); color: #92400e; }
+        @keyframes s360-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.25); } 50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); } }
+        .s360-stat__val { font-size: 18px; font-weight: 800; color: inherit; line-height: 1; }
+        .s360-stat__label { font-size: 10px; font-weight: 700; color: inherit; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.06em; }
+        .s360-refresh-btn { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--zinc-200); background: var(--bg-surface); color: var(--zinc-500); font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-sm); }
+        .s360-upcoming { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); border: 1px solid var(--zinc-200); background: var(--bg-surface); overflow: hidden; box-shadow: var(--shadow-sm); }
+        .s360-upcoming__label { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: var(--zinc-400); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; flex-shrink: 0; }
+        .s360-upcoming__scroll { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: 1; }
         .s360-upcoming__scroll::-webkit-scrollbar { display: none; }
-
-        .s360-upcoming-chip {
-          flex-shrink: 0;
-          padding: 8px 12px;
-          border-radius: 12px;
-          border: 1px solid rgba(223,216,207,0.95);
-          background: rgba(255,255,255,0.85);
-          min-width: 120px;
-          text-align: left;
-          cursor: pointer;
-          transition: transform 0.15s ease;
-        }
-
+        .s360-upcoming-chip { flex-shrink: 0; padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--zinc-200); background: var(--bg-surface); min-width: 120px; text-align: left; cursor: pointer; transition: transform 0.15s ease; }
         .s360-upcoming-chip:hover { transform: translateY(-1px); }
-
-        .s360-upcoming-chip.urgent {
-          border-color: rgba(252,211,77,0.7);
-          background: rgba(254,243,199,0.7);
-        }
-
-        .s360-upcoming-chip__name {
-          font-size: 12px;
-          font-weight: 700;
-          color: #18181b;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 120px;
-        }
-
-        .s360-upcoming-chip__meta {
-          font-size: 10px;
-          color: #8e887f;
-          margin-top: 2px;
-        }
-
-        .s360-upcoming-chip__time {
-          font-size: 11px;
-          font-weight: 800;
-          color: #92400e;
-          margin-top: 4px;
-        }
-
-        .s360-layout {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 16px;
-          align-items: start;
-        }
-
-        .s360-shell.s360-panel-open .s360-layout {
-          grid-template-columns: 1fr 380px;
-        }
-
-        .s360-rooms {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 14px;
-          align-items: start;
-        }
-
-        .s360-room-card {
-          background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(250,248,245,0.98) 100%);
-          border: 1px solid rgba(223,216,207,0.95);
-          border-radius: 20px;
-          padding: 16px;
-          box-shadow: 0 16px 40px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.84);
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .s360-room-card.has-ready {
-          border-color: rgba(134,239,172,0.7);
-          box-shadow: 0 16px 40px rgba(34,197,94,0.08), 0 6px 16px rgba(34,197,94,0.05);
-        }
-
-        .s360-room-card--empty {
-          opacity: 0.4;
-          border-style: dashed;
-          box-shadow: none;
-          flex-direction: row;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px 16px;
-        }
-
-        .s360-room-card__header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 10px;
-        }
-
-        .s360-room-card__name {
-          font-family: var(--font-display);
-          font-size: 20px;
-          font-weight: 500;
-          color: #18181b;
-          letter-spacing: -0.01em;
-        }
-
-        .s360-room-card__sub {
-          font-size: 11px;
-          color: #8e887f;
-          margin-top: 3px;
-        }
-
-        .s360-room-card__empty-label {
-          font-size: 11px;
-          color: #b0a89e;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-        }
-
-        .s360-ready-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 5px 10px;
-          border-radius: 999px;
-          background: rgba(220,252,231,0.9);
-          border: 1px solid rgba(134,239,172,0.6);
-          color: #166534;
-          font-size: 10px;
-          font-weight: 800;
-          animation: s360-pulse 2s infinite;
-          flex-shrink: 0;
-        }
-
-        .s360-room-card__bookings {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .s360-booking-tile {
-          width: 100%;
-          text-align: left;
-          border: 1.5px solid var(--tile-border);
-          background: var(--tile-bg);
-          border-radius: 14px;
-          padding: 11px 13px;
-          cursor: pointer;
-          transition: transform 0.15s ease, box-shadow 0.15s ease;
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-        }
-
-        .s360-booking-tile:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
-        .s360-booking-tile.selected { outline: 2px solid #18181b; outline-offset: 1px; box-shadow: 0 10px 24px rgba(0,0,0,0.10); }
+        .s360-upcoming-chip.urgent { border-color: rgba(252,211,77,0.7); background: rgba(254,243,199,0.7); }
+        .s360-upcoming-chip__name { font-size: 12px; font-weight: 700; color: var(--zinc-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+        .s360-upcoming-chip__meta { font-size: 10px; color: var(--zinc-400); margin-top: 2px; }
+        .s360-upcoming-chip__time { font-size: 11px; font-weight: 800; color: #92400e; margin-top: 4px; }
+        .s360-layout { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+        .s360-shell.s360-panel-open .s360-layout { grid-template-columns: 1fr 380px; }
+        .s360-rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; align-items: start; }
+        .s360-room-card { background: var(--bg-surface); border: 1px solid var(--zinc-200); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 12px; }
+        .s360-room-card.has-ready { border-color: rgba(134,239,172,0.7); box-shadow: 0 0 0 1px rgba(134,239,172,0.4); }
+        .s360-room-card--empty { opacity: 0.4; border-style: dashed; box-shadow: none; flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 16px; }
+        .s360-room-card__header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .s360-room-card__name { font-family: var(--font-display); font-size: 20px; font-weight: 500; color: var(--zinc-900); letter-spacing: -0.01em; }
+        .s360-room-card__sub { font-size: 11px; color: var(--zinc-400); margin-top: 3px; }
+        .s360-room-card__empty-label { font-size: 11px; color: var(--zinc-300); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+        .s360-ready-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; background: rgba(220,252,231,0.9); border: 1px solid rgba(134,239,172,0.6); color: #166534; font-size: 10px; font-weight: 800; animation: s360-pulse 2s infinite; flex-shrink: 0; }
+        .s360-room-card__bookings { display: flex; flex-direction: column; gap: 8px; }
+        .s360-booking-tile { width: 100%; text-align: left; border: 1.5px solid var(--tile-border); background: var(--tile-bg); border-radius: var(--radius-md); padding: 11px 13px; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; display: flex; flex-direction: column; gap: 5px; }
+        .s360-booking-tile:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+        .s360-booking-tile.selected { outline: 2px solid var(--zinc-900); outline-offset: 1px; box-shadow: var(--shadow-md); }
         .s360-booking-tile.tile-ready { border-color: rgba(134,239,172,0.8); }
-
-        .s360-booking-tile__top {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-        }
-
-        .s360-booking-tile__dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 999px;
-          flex-shrink: 0;
-        }
-
-        .s360-booking-tile__name {
-          font-size: 13px;
-          font-weight: 700;
-          color: #18181b;
-          flex: 1;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .s360-booking-tile__party {
-          display: flex;
-          align-items: center;
-          gap: 3px;
-          font-size: 11px;
-          font-weight: 700;
-          color: var(--tile-color);
-          flex-shrink: 0;
-        }
-
-        .s360-booking-tile__meta {
-          display: flex;
-          gap: 8px;
-          font-size: 11px;
-          color: #7a746c;
-          font-weight: 600;
-          align-items: center;
-        }
-
-        .s360-booking-tile__timer {
-          display: inline-flex;
-          align-items: center;
-          gap: 3px;
-          font-size: 10px;
-          color: #a49d94;
-        }
-
-        .s360-booking-tile__dietary {
-          font-size: 10px;
-          font-weight: 700;
-          color: #92400e;
-          background: rgba(254,243,199,0.6);
-          border-radius: 6px;
-          padding: 2px 6px;
-        }
-
-        .s360-booking-tile__orders {
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-
-        .s360-order-dot {
-          font-size: 10px;
-          font-weight: 700;
-          padding: 2px 8px;
-          border-radius: 999px;
-        }
-
+        .s360-booking-tile__top { display: flex; align-items: center; gap: 7px; }
+        .s360-booking-tile__dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; }
+        .s360-booking-tile__name { font-size: 13px; font-weight: 700; color: var(--zinc-900); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .s360-booking-tile__party { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; color: var(--tile-color); flex-shrink: 0; }
+        .s360-booking-tile__meta { display: flex; gap: 8px; font-size: 11px; color: var(--zinc-500); font-weight: 600; align-items: center; }
+        .s360-booking-tile__timer { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--zinc-400); }
+        .s360-booking-tile__dietary { font-size: 10px; font-weight: 700; color: #92400e; background: rgba(254,243,199,0.6); border-radius: 6px; padding: 2px 6px; }
+        .s360-booking-tile__orders { display: flex; gap: 6px; flex-wrap: wrap; }
+        .s360-order-dot { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
         .s360-order-dot.ready { background: rgba(220,252,231,0.9); color: #166534; border: 1px solid rgba(134,239,172,0.5); }
         .s360-order-dot.kitchen { background: rgba(254,243,199,0.9); color: #92400e; border: 1px solid rgba(252,211,77,0.4); }
-
-        .s360-drawer {
-          background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(250,248,245,0.98) 100%);
-          border: 1px solid rgba(223,216,207,0.95);
-          border-radius: 22px;
-          box-shadow: 0 30px 80px rgba(0,0,0,0.10), 0 10px 28px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.84);
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          position: sticky;
-          top: 24px;
-          max-height: calc(100vh - 120px);
-        }
-
-        .s360-drawer__header {
-          padding: 16px 18px;
-          border-bottom: 1px solid rgba(234,229,223,0.9);
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 12px;
-        }
-
-        .s360-drawer__eyebrow {
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: var(--accent, #a38a64);
-          margin-bottom: 4px;
-        }
-
-        .s360-drawer__title {
-          font-family: var(--font-display);
-          font-size: 22px;
-          font-weight: 500;
-          color: #18181b;
-          line-height: 1.1;
-        }
-
-        .s360-drawer__sub {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
-          margin-top: 6px;
-          font-size: 12px;
-          color: #7a746c;
-        }
-
-        .s360-drawer__close {
-          width: 32px;
-          height: 32px;
-          border-radius: 999px;
-          border: 1px solid rgba(230,224,217,0.95);
-          background: rgba(255,255,255,0.72);
-          cursor: pointer;
-          color: #6d675f;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-
-        .s360-status-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 3px 9px;
-          border-radius: 999px;
-          border: 1px solid;
-          font-size: 11px;
-          font-weight: 700;
-        }
-
-        .s360-status-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 999px;
-          display: inline-block;
-        }
-
-        .s360-drawer__body {
-          padding: 14px 18px 18px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          overflow-y: auto;
-        }
-
-        .s360-action-row {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .s360-action-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 9px 16px;
-          border-radius: 999px;
-          font-size: 13px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-
+        .s360-order-dot.preorder { background: rgba(238,242,255,0.9); color: #4338ca; border: 1px solid rgba(129,140,248,0.4); }
+        .s360-order-dot.none { background: var(--zinc-50); color: var(--zinc-400); border: 1px solid var(--zinc-200); }
+        .s360-drawer { background: var(--bg-surface); border: 1px solid var(--zinc-200); border-radius: var(--radius-lg); box-shadow: var(--shadow-flyout); display: flex; flex-direction: column; overflow: hidden; position: sticky; top: 24px; max-height: calc(100vh - 120px); }
+        .s360-drawer__header { padding: 16px 18px; border-bottom: 1px solid var(--zinc-200); display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .s360-drawer__eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+        .s360-drawer__title { font-family: var(--font-display); font-size: 22px; font-weight: 500; color: var(--zinc-900); line-height: 1.1; }
+        .s360-drawer__sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 12px; color: var(--zinc-500); }
+        .s360-drawer__close { width: 32px; height: 32px; border-radius: 999px; border: 1px solid var(--zinc-200); background: var(--bg-surface); cursor: pointer; color: var(--zinc-400); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .s360-status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; border: 1px solid; font-size: 11px; font-weight: 700; }
+        .s360-status-dot { width: 6px; height: 6px; border-radius: 999px; display: inline-block; }
+        .s360-drawer__body { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+        .s360-action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .s360-action-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 999px; font-size: 13px; font-weight: 700; cursor: pointer; transition: transform 0.15s ease; }
         .s360-action-btn:hover { transform: translateY(-1px); }
         .s360-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .s360-action-btn--primary {
-          background: #18181b;
-          color: white;
-          border: none;
-          box-shadow: 0 10px 24px rgba(0,0,0,0.14);
-          flex: 1;
-          justify-content: center;
-        }
-
-        .s360-action-btn--ghost {
-          background: rgba(248,245,241,0.88);
-          color: #5f5a53;
-          border: 1px solid rgba(223,216,207,0.95);
-        }
-
-        .s360-dietary-alert {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 14px;
-          border-radius: 12px;
-          background: rgba(254,243,199,0.85);
-          border: 1px solid rgba(252,211,77,0.5);
-          color: #92400e;
-          font-size: 12px;
-          font-weight: 700;
-        }
-
+        .s360-action-btn--primary { background: var(--zinc-900); color: var(--bg-surface); border: none; box-shadow: var(--shadow-sm); flex: 1; justify-content: center; }
+        .s360-action-btn--ghost { background: var(--zinc-50); color: var(--zinc-600); border: 1px solid var(--zinc-200); }
+        .s360-dietary-alert { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--radius-md); background: rgba(254,243,199,0.85); border: 1px solid rgba(252,211,77,0.5); color: #92400e; font-size: 12px; font-weight: 700; }
         .s360-dietary-alert__icon { font-size: 14px; flex-shrink: 0; }
-
-        .s360-drawer-section {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .s360-drawer-section__label {
-          font-size: 10px;
-          font-weight: 700;
-          color: #9b948b;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          display: flex;
-          align-items: center;
-          gap: 5px;
-        }
-
-        .s360-drawer-section__header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
+        .s360-drawer-section { display: flex; flex-direction: column; gap: 8px; }
+        .s360-drawer-section__label { font-size: 10px; font-weight: 700; color: var(--zinc-400); text-transform: uppercase; letter-spacing: 0.1em; display: flex; align-items: center; gap: 5px; }
+        .s360-drawer-section__header { display: flex; justify-content: space-between; align-items: center; }
         .s360-attendee-list { display: flex; flex-direction: column; gap: 6px; }
-
-        .s360-attendee-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 10px;
-          padding: 8px 10px;
-          border-radius: 10px;
-          background: rgba(248,245,241,0.88);
-          border: 1px solid rgba(235,229,223,0.95);
-        }
-
-        .s360-attendee-row__name { font-size: 12px; font-weight: 700; color: #2b2824; }
+        .s360-attendee-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-md); background: var(--zinc-50); border: 1px solid var(--zinc-200); }
+        .s360-attendee-row__name { font-size: 12px; font-weight: 700; color: var(--zinc-900); }
         .s360-attendee-row__flags { font-size: 10px; color: #92400e; font-weight: 700; text-align: right; max-width: 50%; line-height: 1.4; }
-
-        .s360-add-order-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 5px 12px;
-          border-radius: 999px;
-          border: 1px solid rgba(223,216,207,0.95);
-          background: #18181b;
-          color: white;
-          font-size: 11px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .s360-empty-orders { font-size: 12px; color: #a49d94; padding: 8px 0; }
+        .s360-add-order-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--zinc-200); background: var(--zinc-900); color: var(--bg-surface); font-size: 11px; font-weight: 700; cursor: pointer; }
+        .s360-empty-orders { font-size: 12px; color: var(--zinc-400); padding: 8px 0; }
         .s360-order-list { display: flex; flex-direction: column; gap: 8px; }
-
-        .s360-order-card {
-          border: 1px solid rgba(235,229,223,0.95);
-          border-radius: 14px;
-          overflow: hidden;
-          background: rgba(255,255,255,0.75);
-        }
-
-        .s360-order-card--ready {
-          border-color: rgba(134,239,172,0.7);
-          background: rgba(240,253,244,0.6);
-        }
-
-        .s360-order-card__header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 9px 12px;
-          border-bottom: 1px solid rgba(235,229,223,0.8);
-        }
-
-        .s360-order-card__id { font-size: 12px; font-weight: 700; color: #3f3a34; }
-
-        .s360-order-status {
-          font-size: 10px;
-          font-weight: 800;
-          padding: 3px 8px;
-          border-radius: 999px;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-        }
-
-        .s360-order-items {
-          padding: 8px 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .s360-order-item {
-          display: flex;
-          align-items: baseline;
-          gap: 6px;
-          font-size: 12px;
-          color: #3f3a34;
-          flex-wrap: wrap;
-        }
-
-        .s360-order-item__qty { font-weight: 800; color: #18181b; flex-shrink: 0; }
+        .s360-order-card { border: 1px solid var(--zinc-200); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-surface); }
+        .s360-order-card--ready { border-color: rgba(134,239,172,0.7); background: rgba(240,253,244,0.6); }
+        .s360-order-card__header { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--zinc-100); }
+        .s360-order-card__id { font-size: 12px; font-weight: 700; color: var(--zinc-800); }
+        .s360-order-status { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .s360-order-items { padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+        .s360-order-item { display: flex; align-items: baseline; gap: 6px; font-size: 12px; color: var(--zinc-800); flex-wrap: wrap; }
+        .s360-order-item__qty { font-weight: 800; color: var(--zinc-900); flex-shrink: 0; }
         .s360-order-item__name { font-weight: 600; flex: 1; }
-        .s360-order-item__note { font-size: 10px; color: #8b7d6b; font-style: italic; width: 100%; padding-left: 18px; }
-
+        .s360-order-item__note { font-size: 10px; color: var(--zinc-400); font-style: italic; width: 100%; padding-left: 18px; }
         .s360-order-card__actions { padding: 8px 12px; display: flex; gap: 8px; }
-
-        .s360-fire-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 7px 14px;
-          border-radius: 999px;
-          border: none;
-          background: #18181b;
-          color: white;
-          font-size: 12px;
-          font-weight: 700;
-          cursor: pointer;
-          box-shadow: 0 8px 18px rgba(0,0,0,0.14);
-        }
-
+        .s360-fire-btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 999px; border: none; background: var(--zinc-900); color: var(--bg-surface); font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow-sm); }
         .s360-fire-btn:disabled, .s360-serve-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .s360-serve-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 7px 14px;
-          border-radius: 999px;
-          border: 1px solid rgba(134,239,172,0.6);
-          background: rgba(220,252,231,0.85);
-          color: #166534;
-          font-size: 12px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .s360-notes {
-          font-size: 12px;
-          color: #5e5952;
-          font-style: italic;
-          line-height: 1.6;
-          padding: 8px 10px;
-          background: rgba(248,245,241,0.88);
-          border-radius: 10px;
-          border: 1px solid rgba(235,229,223,0.95);
-        }
-
-        .s360-empty {
-          text-align: center;
-          padding: 60px 24px;
-          border-radius: 20px;
-          border: 1px dashed rgba(223,216,207,0.95);
-          background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(250,248,245,0.98) 100%);
-        }
-
-        .s360-empty__title { font-family: var(--font-display); font-size: 26px; color: #18181b; margin-bottom: 6px; }
-        .s360-empty__sub { font-size: 13px; color: #8e887f; }
-
-        .s360-toast {
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-          padding: 12px 14px;
-          border-radius: 16px;
-          box-shadow: 0 20px 50px rgba(0,0,0,0.14);
-          backdrop-filter: blur(8px);
-          animation: s360-slide-in 0.3s ease;
-        }
-
-        .s360-toast--ready {
-          background: rgba(220,252,231,0.96);
-          border: 1px solid rgba(134,239,172,0.7);
-        }
-
-        .s360-toast--fired {
-          background: rgba(254,243,199,0.96);
-          border: 1px solid rgba(252,211,77,0.6);
-        }
-
-        @keyframes s360-slide-in {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-
+        .s360-serve-btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(134,239,172,0.6); background: rgba(220,252,231,0.85); color: #166534; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .s360-notes { font-size: 12px; color: var(--zinc-500); font-style: italic; line-height: 1.6; padding: 8px 10px; background: var(--zinc-50); border-radius: var(--radius-md); border: 1px solid var(--zinc-200); }
+        .s360-empty { text-align: center; padding: 60px 24px; border-radius: var(--radius-lg); border: 1px dashed var(--zinc-200); background: var(--bg-surface); }
+        .s360-empty__title { font-family: var(--font-display); font-size: 26px; color: var(--zinc-900); margin-bottom: 6px; }
+        .s360-empty__sub { font-size: 13px; color: var(--zinc-400); }
+        .s360-toast { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: var(--radius-lg); box-shadow: var(--shadow-flyout); backdrop-filter: blur(8px); animation: s360-slide-in 0.3s ease; }
+        .s360-toast--ready { background: rgba(220,252,231,0.96); border: 1px solid rgba(134,239,172,0.7); }
+        .s360-toast--fired { background: rgba(254,243,199,0.96); border: 1px solid rgba(252,211,77,0.6); }
+        @keyframes s360-slide-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .s360-toast__icon { flex-shrink: 0; margin-top: 1px; }
         .s360-toast--ready .s360-toast__icon { color: #166534; }
         .s360-toast--fired .s360-toast__icon { color: #92400e; }
-
         .s360-toast__body { flex: 1; min-width: 0; }
-
         .s360-toast__title { font-size: 12px; font-weight: 800; }
         .s360-toast--ready .s360-toast__title { color: #166534; }
         .s360-toast--fired .s360-toast__title { color: #92400e; }
-
         .s360-toast__detail { font-size: 11px; margin-top: 2px; line-height: 1.4; }
         .s360-toast--ready .s360-toast__detail { color: #15803d; }
         .s360-toast--fired .s360-toast__detail { color: #78350f; }
-
         .s360-toast__close { background: none; border: none; cursor: pointer; opacity: 0.6; padding: 2px; flex-shrink: 0; color: inherit; }
-
-        @media (max-width: 1100px) {
-          .s360-shell.s360-panel-open .s360-layout { grid-template-columns: 1fr; }
-          .s360-drawer { position: static; max-height: none; }
-        }
-
-        @media (max-width: 760px) {
-          .s360-header { flex-direction: column; align-items: flex-start; }
-          .s360-rooms { grid-template-columns: 1fr; }
-          .s360-header__title { font-size: 26px; }
-        }
-
-        .s360-order-dot.preorder {
-  background: rgba(238,242,255,0.9);
-  color: #4338ca;
-  border: 1px solid rgba(129,140,248,0.4);
-}
-.s360-order-dot.none {
-  background: rgba(244,244,245,0.8);
-  color: #a1a1aa;
-  border: 1px solid rgba(228,228,231,0.6);
-}
-  @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 1100px) { .s360-shell.s360-panel-open .s360-layout { grid-template-columns: 1fr; } .s360-drawer { position: static; max-height: none; } }
+        @media (max-width: 760px) { .s360-header { flex-direction: column; align-items: flex-start; } .s360-rooms { grid-template-columns: 1fr; } .s360-header__title { font-size: 26px; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
