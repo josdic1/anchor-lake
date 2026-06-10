@@ -54,8 +54,7 @@
   --font-club-label: "Barlow Condensed", "Arial Narrow", sans-serif;
   --font-body:
     "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Backward-compatible aliases used by order/service components */
   --green: var(--zinc-900);
@@ -241,8 +240,6 @@ hr {
 }
 
 .club-label,
-.app-nav__link,
-.app-header__role,
 .bookings-table th,
 .column-title,
 .login-eyebrow,
@@ -1547,7 +1544,6 @@ hr {
     transform: rotate(360deg);
   }
 }
-
 
 /* ================================================================
    RESPONSIVE APP LAYOUT
