@@ -54,6 +54,7 @@ export function AppShell({ children }: AppShellProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isOnNewBookingPage = location.pathname === "/booking";
+  const [routeLoading, setRouteLoading] = useState(false);
 
   const isAdmin = user?.role === "admin";
   const isStaffOrAdmin = user?.role === "staff" || isAdmin;
@@ -71,6 +72,12 @@ export function AppShell({ children }: AppShellProps) {
   }, [isAuthenticated]);
 
   useEffect(() => {
+    setRouteLoading(true);
+    const t = window.setTimeout(() => setRouteLoading(false), 220);
+    return () => window.clearTimeout(t);
+  }, [location.pathname]);
+
+  useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (
         e.key === "n" &&
@@ -86,7 +93,7 @@ export function AppShell({ children }: AppShellProps) {
   }, [navigate]);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${!isAuthenticated ? "app-shell--guest" : ""}`}>
       <header className="app-header">
         <a
           href="/"
@@ -296,7 +303,10 @@ export function AppShell({ children }: AppShellProps) {
         )}
       </header>
 
-      <main className="app-main">{children}</main>
+      <main className={`app-main ${!isAuthenticated ? "app-main--guest" : ""}`}>
+        {routeLoading && <div className="app-route-loader" aria-hidden="true" />}
+        {children}
+      </main>
 
       <HoursOfOperationModal
         isOpen={isHoursOpen}

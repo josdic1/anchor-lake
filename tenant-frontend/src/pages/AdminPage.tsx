@@ -566,7 +566,14 @@ function TableShell({
   loading: boolean;
   error: string;
 }) {
-  if (loading) return <div className="table-state">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="table-state table-state--loading">
+        <span className="page-spinner" />
+        <span>Loading...</span>
+      </div>
+    );
+  }
   if (error)
     return (
       <div className="table-state" style={{ color: "var(--error)" }}>
@@ -1180,6 +1187,7 @@ function MembersTab() {
     last_name: "",
     relation: "PRIMARY",
     dietary_flags: [] as string[],
+    dietary_other_note: "",
   });
   const [saving, setSaving] = useState(false);
   const [formErr, setFormErr] = useState("");
@@ -1225,7 +1233,12 @@ function MembersTab() {
   async function saveEdit(id: number, userId: number) {
     const updated = await usersApi.patch(
       `/users/${userId}/members/${id}`,
-      editForm,
+      {
+        ...editForm,
+        dietary_other_note: (editForm.dietary_flags ?? []).includes("OTHER")
+          ? editForm.dietary_other_note?.trim() || null
+          : null,
+      },
     );
     setMembers((prev) => prev.map((m) => (m.id === id ? updated.data : m)));
     setEditingId(null);
@@ -1259,6 +1272,9 @@ function MembersTab() {
         last_name: newForm.last_name,
         relation: newForm.relation,
         dietary_flags: newForm.dietary_flags,
+        dietary_other_note: newForm.dietary_flags.includes("OTHER")
+          ? newForm.dietary_other_note.trim() || null
+          : null,
         notes: null,
       });
       setMembers((prev) => [...prev, created.data]);
@@ -1269,6 +1285,7 @@ function MembersTab() {
         last_name: "",
         relation: "PRIMARY",
         dietary_flags: [],
+        dietary_other_note: "",
       });
     } catch (e: any) {
       setFormErr(e?.response?.data?.detail ?? "Failed to create member.");
@@ -1278,12 +1295,19 @@ function MembersTab() {
   }
 
   function toggleNewFlag(flag: string) {
-    setNewForm((f) => ({
-      ...f,
-      dietary_flags: f.dietary_flags.includes(flag)
+    setNewForm((f) => {
+      const nextFlags = f.dietary_flags.includes(flag)
         ? f.dietary_flags.filter((x) => x !== flag)
-        : [...f.dietary_flags, flag],
-    }));
+        : [...f.dietary_flags, flag];
+
+      return {
+        ...f,
+        dietary_flags: nextFlags,
+        dietary_other_note: nextFlags.includes("OTHER")
+          ? f.dietary_other_note
+          : "",
+      };
+    });
   }
 
   return (
@@ -1426,6 +1450,22 @@ function MembersTab() {
                   );
                 })}
               </div>
+              {newForm.dietary_flags.includes("OTHER") && (
+                <label style={{ marginTop: "10px", display: "grid", gap: "6px" }}>
+                  <span className="field-label">Other dietary note</span>
+                  <input
+                    type="text"
+                    value={newForm.dietary_other_note}
+                    placeholder="Describe the dietary restriction..."
+                    onChange={(e) =>
+                      setNewForm({
+                        ...newForm,
+                        dietary_other_note: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+              )}
             </div>
             {formErr && <p className="error-text">{formErr}</p>}
             <button
@@ -1571,14 +1611,23 @@ function MembersTab() {
                               key={flag}
                               type="button"
                               onClick={() =>
-                                setEditForm((f: any) => ({
-                                  ...f,
-                                  dietary_flags: active
-                                    ? f.dietary_flags.filter(
+                                setEditForm((f: any) => {
+                                  const nextFlags = active
+                                    ? (f.dietary_flags ?? []).filter(
                                         (x: string) => x !== flag,
                                       )
-                                    : [...(f.dietary_flags ?? []), flag],
-                                }))
+                                    : [...(f.dietary_flags ?? []), flag];
+
+                                  return {
+                                    ...f,
+                                    dietary_flags: nextFlags,
+                                    dietary_other_note: nextFlags.includes(
+                                      "OTHER",
+                                    )
+                                      ? (f.dietary_other_note ?? "")
+                                      : "",
+                                  };
+                                })
                               }
                               style={{
                                 padding: "1px 7px",
@@ -1597,26 +1646,28 @@ function MembersTab() {
                           );
                         })}
                       </div>
-                      <textarea
-                        rows={2}
-                        placeholder="Other dietary notes..."
-                        value={editForm.dietary_other_note ?? ""}
-                        onChange={(e) =>
-                          setEditForm({
-                            ...editForm,
-                            dietary_other_note: e.target.value,
-                          })
-                        }
-                        style={{
-                          marginTop: "4px",
-                          padding: "4px 8px",
-                          border: "1px solid var(--zinc-300)",
-                          borderRadius: "4px",
-                          fontSize: "12px",
-                          width: "100%",
-                          resize: "vertical",
-                        }}
-                      />
+                      {(editForm.dietary_flags ?? []).includes("OTHER") && (
+                        <textarea
+                          rows={2}
+                          placeholder="Other dietary notes..."
+                          value={editForm.dietary_other_note ?? ""}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              dietary_other_note: e.target.value,
+                            })
+                          }
+                          style={{
+                            marginTop: "4px",
+                            padding: "4px 8px",
+                            border: "1px solid var(--zinc-300)",
+                            borderRadius: "4px",
+                            fontSize: "12px",
+                            width: "100%",
+                            resize: "vertical",
+                          }}
+                        />
+                      )}
                     </div>
                   ) : (
                     <span>
@@ -1649,7 +1700,7 @@ function MembersTab() {
                         ? m.dietary_flags.join(", ").replace(/_/g, " ")
                         : "—"}
                     </span>
-                    {m.dietary_other_note && (
+                    {m.dietary_flags?.includes("OTHER") && m.dietary_other_note && (
                       <span
                         style={{
                           fontSize: "11px",
@@ -2725,7 +2776,14 @@ function MealWindowsTab() {
     }
   }
 
-  if (loading) return <div className="table-state">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="table-state table-state--loading">
+        <span className="page-spinner" />
+        <span>Loading...</span>
+      </div>
+    );
+  }
   if (error)
     return (
       <div className="table-state" style={{ color: "var(--error)" }}>

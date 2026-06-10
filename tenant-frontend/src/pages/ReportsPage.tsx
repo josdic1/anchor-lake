@@ -1114,7 +1114,14 @@ export function ReportsPage() {
     </div>
   );
 
-  if (loading) return <div className="table-state">Loading report data...</div>;
+  if (loading) {
+    return (
+      <div className="table-state table-state--loading">
+        <span className="page-spinner" />
+        <span>Loading report data...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="fade-in">

@@ -777,10 +777,12 @@ export function LoginPage() {
     return (
       <div
         style={{
-          minHeight: "100vh",
+          height: "calc(100dvh - 72px)",
+          minHeight: "540px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          overflow: "hidden",
         }}
       >
         <div
@@ -800,15 +802,23 @@ export function LoginPage() {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        height: "calc(100dvh - 72px)",
+        minHeight: "540px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "20px",
+        padding: "10px 20px",
         background: "var(--bg-canvas)",
+        overflow: "hidden",
       }}
     >
-      <div style={{ width: "100%", maxWidth: "460px" }}>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "430px",
+          transform: "translateY(-8px)",
+        }}
+      >
         {pageMode === "setup" ? (
           <SetupFlow
             onSetupDone={() => setPageMode("login")}
@@ -816,14 +826,14 @@ export function LoginPage() {
           />
         ) : (
           <>
-            <div style={{ marginBottom: "34px", textAlign: "center" }}>
+            <div style={{ marginBottom: "18px", textAlign: "center" }}>
               {logo_url && (
                 <div
                   style={{
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    marginBottom: "24px",
+                    marginBottom: "12px",
                   }}
                 >
                   <img
@@ -831,10 +841,10 @@ export function LoginPage() {
                     alt={name}
                     style={{
                       display: "block",
-                      width: "min(92vw, 420px)",
+                      width: "min(84vw, 330px)",
                       height: "auto",
                       maxWidth: "100%",
-                      maxHeight: "200px",
+                      maxHeight: "132px",
                       objectFit: "contain",
                     }}
                   />
@@ -843,7 +853,7 @@ export function LoginPage() {
               <div
                 style={{
                   fontFamily: "var(--font-display)",
-                  fontSize: "34px",
+                  fontSize: "31px",
                   fontWeight: 500,
                   color: "var(--zinc-900)",
                   marginBottom: "4px",
@@ -864,8 +874,8 @@ export function LoginPage() {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "15px",
-                marginTop: "20px",
+                gap: "12px",
+                marginTop: "14px",
               }}
             >
               <div className="form-stack">
@@ -911,7 +921,7 @@ export function LoginPage() {
                 type="submit"
                 disabled={loading}
                 className="btn-primary"
-                style={{ width: "100%", padding: "13px", fontSize: "14px" }}
+                style={{ width: "100%", padding: "12px", fontSize: "14px" }}
               >
                 {loading ? "Signing in..." : "Sign in"}
               </button>
