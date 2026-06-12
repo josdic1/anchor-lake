@@ -566,3 +566,24 @@ def get_booking_full(booking_id: int, current_user: dict = Depends(get_current_u
     finally:
         cur.close()
         conn.close()
+
+# =============================================================================
+# AUDIT LOG
+# =============================================================================
+
+@router.get("/audit-log")
+def get_audit_log(current_user: dict = Depends(require_role("admin"))):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT id, entity_type, entity_id, action, old_value, new_value,
+                   performed_by, performed_at, notes
+            FROM audit_log
+            ORDER BY performed_at DESC
+            LIMIT 500
+        """)
+        return [dict(row) for row in cur.fetchall()]
+    finally:
+        cur.close()
+        conn.close()
