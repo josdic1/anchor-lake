@@ -80,6 +80,11 @@ def execute_transition(cur, booking: dict, new_status: str, user_id: int, role: 
     """
     current_status = booking["status"]
     booking_id = booking["id"]
+    if new_status == "COMPLETED" and current_status == "SEATED" and role == "admin":
+        execute_transition(cur, booking, "SERVICE", user_id, role)
+        cur.execute("SELECT * FROM bookings WHERE id = %s", (booking_id,))
+        booking = dict(cur.fetchone())
+        current_status = booking["status"]
 
     if new_status not in VALID_TRANSITIONS.get(current_status, []):
         raise HTTPException(

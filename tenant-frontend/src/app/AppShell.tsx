@@ -39,7 +39,11 @@ function useStuckBookingCount() {
 
     load();
     const interval = setInterval(load, 60000);
-    return () => clearInterval(interval);
+    window.addEventListener("stuck-bookings-changed", load);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("stuck-bookings-changed", load);
+    };
   }, [user?.role]);
 
   return count;

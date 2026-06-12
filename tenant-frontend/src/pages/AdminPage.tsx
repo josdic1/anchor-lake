@@ -341,6 +341,7 @@ function NeedsAttention({ refreshKey }: { refreshKey: number }) {
     try {
       await bookingsApi.post(`/bookings/${id}/actions/complete`);
       setStuck((prev) => prev.filter((b) => b.id !== id));
+      window.dispatchEvent(new Event("stuck-bookings-changed"));
     } finally {
       setCompleting(null);
     }
@@ -355,6 +356,7 @@ function NeedsAttention({ refreshKey }: { refreshKey: number }) {
         ),
       );
       setStuck([]);
+      window.dispatchEvent(new Event("stuck-bookings-changed"));
     } finally {
       setCompletingAll(false);
     }
