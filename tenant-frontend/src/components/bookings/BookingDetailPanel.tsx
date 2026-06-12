@@ -77,6 +77,7 @@ function AttendeeEditor({
     first_name: "",
     last_name: "",
     dietary_flags: [] as string[],
+    dietary_other_note: "",
     is_member_guest: false,
   });
   const [saving, setSaving] = useState(false);
@@ -126,7 +127,9 @@ function AttendeeEditor({
         first_name: guestForm.first_name.trim(),
         last_name: guestForm.last_name.trim(),
         dietary_flags: guestForm.dietary_flags,
-        dietary_other_note: "",
+        dietary_other_note: guestForm.dietary_flags.includes("OTHER")
+          ? guestForm.dietary_other_note.trim()
+          : "",
         is_member_guest: false,
         linked_member_id: null,
       });
@@ -134,6 +137,7 @@ function AttendeeEditor({
         first_name: "",
         last_name: "",
         dietary_flags: [],
+        dietary_other_note: "",
         is_member_guest: false,
       });
       setShowAddGuest(false);
@@ -390,6 +394,7 @@ function AttendeeEditor({
                   first_name: "",
                   last_name: "",
                   dietary_flags: [],
+                  dietary_other_note: "",
                   is_member_guest: false,
                 });
               }}
