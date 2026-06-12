@@ -45,6 +45,15 @@ const DIETARY_FLAGS = [
   "VEGETARIAN",
 ];
 
+const ALLERGENS = [
+  "FISH_ALLERGY",
+  "SHELLFISH_ALLERGY",
+  "NUT_ALLERGY",
+  "PEANUT_ALLERGY",
+  "SESAME_ALLERGY",
+  "EGG_FREE",
+];
+
 const EMPTY_FORM = {
   name: "",
   description: "",
@@ -88,6 +97,27 @@ function Badge({
     >
       {label}
     </span>
+  );
+}
+
+function DietaryCell({ flags }: { flags: string[] }) {
+  const safe = flags.filter((f) => !ALLERGENS.includes(f));
+  const alerts = flags.filter((f) => ALLERGENS.includes(f));
+  if (flags.length === 0)
+    return <span style={{ color: "var(--zinc-400)" }}>—</span>;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+      {safe.length > 0 && (
+        <span style={{ fontSize: "11px", color: "var(--zinc-500)" }}>
+          {safe.map((f) => f.replace(/_/g, " ")).join(", ")}
+        </span>
+      )}
+      {alerts.length > 0 && (
+        <span style={{ fontSize: "11px", color: "#b45309", fontWeight: 600 }}>
+          ⚠ {alerts.map((f) => f.replace(/_/g, " ")).join(", ")}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -460,18 +490,8 @@ export function MenuManagementPage() {
                             )}
                           </td>
                           <td style={tdStyle}>${item.price.toFixed(2)}</td>
-                          <td
-                            style={{
-                              ...tdStyle,
-                              fontSize: "11px",
-                              color: "var(--zinc-500)",
-                            }}
-                          >
-                            {item.dietary_flags.length > 0
-                              ? item.dietary_flags
-                                  .map((f) => f.replace(/_/g, " "))
-                                  .join(", ")
-                              : "—"}
+                          <td style={tdStyle}>
+                            <DietaryCell flags={item.dietary_flags} />
                           </td>
                           <td style={tdStyle}>
                             <div
@@ -541,12 +561,8 @@ export function MenuManagementPage() {
                               {mod.name}
                             </td>
                             <td style={tdSmStyle}>+${mod.price.toFixed(2)}</td>
-                            <td style={{ ...tdSmStyle, fontSize: "11px" }}>
-                              {mod.dietary_flags.length > 0
-                                ? mod.dietary_flags
-                                    .map((f) => f.replace(/_/g, " "))
-                                    .join(", ")
-                                : "—"}
+                            <td style={tdSmStyle}>
+                              <DietaryCell flags={mod.dietary_flags} />
                             </td>
                             <td style={tdSmStyle}>
                               <Badge label="Modifier" />
@@ -605,15 +621,14 @@ export function MenuManagementPage() {
           <div
             style={{
               width: "440px",
-              height: "100vh",
+              height: "100%",
               background: "var(--bg-surface)",
               boxShadow: "var(--shadow-flyout)",
               display: "flex",
               flexDirection: "column",
-              overflowY: "hidden",
+              overflowY: "auto",
             }}
           >
-            {/* Header — pinned */}
             <div
               style={{
                 display: "flex",
@@ -621,7 +636,6 @@ export function MenuManagementPage() {
                 alignItems: "center",
                 padding: "1.25rem 1.5rem",
                 borderBottom: "1px solid var(--zinc-200)",
-                flexShrink: 0,
               }}
             >
               <h3
@@ -641,8 +655,6 @@ export function MenuManagementPage() {
                 <X size={16} />
               </button>
             </div>
-
-            {/* Body — scrolls */}
             <div
               style={{
                 padding: "1.5rem",
@@ -650,7 +662,6 @@ export function MenuManagementPage() {
                 flexDirection: "column",
                 gap: "1.25rem",
                 flex: 1,
-                overflowY: "auto",
               }}
             >
               <div className="form-stack">
@@ -686,7 +697,7 @@ export function MenuManagementPage() {
               >
                 <div className="form-stack">
                   <label>
-                    <span>Price ($)</span>
+                    <span>Price ($) *</span>
                     <input
                       type="number"
                       step="0.01"
@@ -861,15 +872,12 @@ export function MenuManagementPage() {
               </div>
               {saveError && <p className="error-text">{saveError}</p>}
             </div>
-
-            {/* Footer — pinned */}
             <div
               style={{
                 padding: "1.25rem 1.5rem",
                 borderTop: "1px solid var(--zinc-200)",
                 display: "flex",
                 gap: "0.75rem",
-                flexShrink: 0,
               }}
             >
               <button
