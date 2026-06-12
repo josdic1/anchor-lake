@@ -28,7 +28,14 @@ import type { MenuItem, MenuCategory } from "../api/menu";
 import { getMealWindows } from "../api/mealWindows";
 import type { MealWindow, MealType } from "../types/booking";
 
-type Tab = "users" | "members" | "menu" | "rooms" | "meal-windows" | "bookings";
+type Tab =
+  | "users"
+  | "members"
+  | "menu"
+  | "rooms"
+  | "meal-windows"
+  | "bookings"
+  | "audit";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "users", label: "Users" },
@@ -37,6 +44,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "rooms", label: "Rooms" },
   { key: "meal-windows", label: "Hours" },
   { key: "bookings", label: "Bookings" },
+  { key: "audit", label: "Audit Log" },
 ];
 
 const TAB_DESCRIPTIONS: Record<Tab, string> = {
@@ -46,6 +54,7 @@ const TAB_DESCRIPTIONS: Record<Tab, string> = {
   rooms: "Manage dining rooms and capacity",
   "meal-windows": "Set service hours and available days for each meal period",
   bookings: "View and force-update any booking status",
+  audit: "Read-only history of all actions taken in the system",
 };
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -55,6 +64,7 @@ const TAB_LABELS: Record<Tab, string> = {
   rooms: "Loading rooms...",
   "meal-windows": "Loading hours...",
   bookings: "Loading bookings...",
+  audit: "Loading audit log...",
 };
 
 function SearchBar({
@@ -2949,6 +2959,191 @@ function MealWindowsTab({ onDone }: { onDone: () => void }) {
   );
 }
 
+function AuditTab({ onDone }: { onDone: () => void }) {
+  const [entries, setEntries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(
+    entries,
+    "id",
+    "desc",
+  );
+
+  useEffect(() => {
+    bookingsApi
+      .get("/audit-log")
+      .then((r) => setEntries(r.data))
+      .catch(() => setError("Failed to load audit log"))
+      .finally(() => {
+        setLoading(false);
+        onDone();
+      });
+  }, []);
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? sorted.filter(
+        (e) =>
+          (e.action ?? "").toLowerCase().includes(q) ||
+          (e.entity_type ?? "").toLowerCase().includes(q) ||
+          String(e.entity_id).includes(q) ||
+          String(e.performed_by ?? "").includes(q),
+      )
+    : sorted;
+
+  const ACTION_COLORS: Record<string, "green" | "red" | "blue" | "default"> = {
+    BOOKING_CREATED: "green",
+    BOOKING_CONFIRMED: "green",
+    BOOKING_COMPLETED: "green",
+    BOOKING_CANCELLED: "red",
+    BOOKING_UPDATED: "blue",
+    BOOKING_SEATED: "blue",
+    BOOKING_SERVICE_STARTED: "blue",
+    BOOKING_REVERTED_TO_DRAFT: "default",
+    ATTENDEE_ADDED: "green",
+    ATTENDEE_REMOVED: "red",
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: "1rem" }}>
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by action, type, ID..."
+        />
+      </div>
+      {q && (
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--zinc-400)",
+            marginBottom: "0.75rem",
+          }}
+        >
+          {filtered.length} result{filtered.length !== 1 ? "s" : ""} for &ldquo;
+          {search}&rdquo;
+        </p>
+      )}
+      <TableShell loading={loading} error={error}>
+        <thead>
+          <tr>
+            <SortableTh
+              sortKey="id"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              ID
+            </SortableTh>
+            <SortableTh
+              sortKey="action"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Action
+            </SortableTh>
+            <SortableTh
+              sortKey="entity_type"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Type
+            </SortableTh>
+            <SortableTh
+              sortKey="entity_id"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              Entity ID
+            </SortableTh>
+            <SortableTh
+              sortKey="performed_by"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              By
+            </SortableTh>
+            <Th>Old</Th>
+            <Th>New</Th>
+            <SortableTh
+              sortKey="performed_at"
+              activeSortKey={String(sortKey)}
+              sortDir={sortDir}
+              onSort={handleSort}
+            >
+              When
+            </SortableTh>
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((e) => (
+            <tr key={e.id}>
+              <Td mono>{e.id}</Td>
+              <Td>
+                <Badge
+                  label={e.action}
+                  variant={ACTION_COLORS[e.action] ?? "default"}
+                />
+              </Td>
+              <Td>{e.entity_type}</Td>
+              <Td mono>{e.entity_id}</Td>
+              <Td mono>{e.performed_by ?? "—"}</Td>
+              <Td>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--zinc-500)",
+                    fontFamily: "ui-monospace, monospace",
+                  }}
+                >
+                  {e.old_value ? JSON.stringify(e.old_value) : "—"}
+                </span>
+              </Td>
+              <Td>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--zinc-500)",
+                    fontFamily: "ui-monospace, monospace",
+                  }}
+                >
+                  {e.new_value ? JSON.stringify(e.new_value) : "—"}
+                </span>
+              </Td>
+              <Td>
+                <span style={{ fontSize: "12px", color: "var(--zinc-500)" }}>
+                  {new Date(e.performed_at).toLocaleString()}
+                </span>
+              </Td>
+            </tr>
+          ))}
+          {filtered.length === 0 && !loading && (
+            <tr>
+              <td
+                colSpan={8}
+                style={{
+                  padding: "2rem",
+                  textAlign: "center",
+                  fontSize: "13px",
+                  color: "var(--zinc-400)",
+                }}
+              >
+                No entries match &ldquo;{search}&rdquo;
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </TableShell>
+    </div>
+  );
+}
+
 export function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>("users");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -3027,6 +3222,7 @@ export function AdminPage() {
       {activeTab === "bookings" && (
         <BookingsTab onStatusChange={triggerRefresh} onDone={handleTabDone} />
       )}
+      {activeTab === "audit" && <AuditTab onDone={handleTabDone} />}
     </div>
   );
 }
