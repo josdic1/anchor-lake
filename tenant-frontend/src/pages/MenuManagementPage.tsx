@@ -150,10 +150,6 @@ export function MenuManagementPage() {
       setSaveError("Name is required.");
       return;
     }
-    if (!form.price || form.price <= 0) {
-      setSaveError("Price must be > 0.");
-      return;
-    }
     setSaving(true);
     setSaveError("");
     try {
@@ -256,7 +252,6 @@ export function MenuManagementPage() {
 
   return (
     <div className="fade-in">
-      {/* MANUAL LOADER PORTAL */}
       {manualLoading && (
         <TenantLoader isManual manualExit={() => setManualLoading(false)} />
       )}
@@ -486,9 +481,6 @@ export function MenuManagementPage() {
                                 flexWrap: "wrap",
                               }}
                             >
-                              {item.is_starter && (
-                                <Badge label="Pre-order" color="blue" />
-                              )}
                               {item.is_special && <Badge label="Special" />}
                               {(modsByParent[item.id]?.length ?? 0) > 0 && (
                                 <Badge
@@ -595,7 +587,7 @@ export function MenuManagementPage() {
         })}
       </div>
 
-      {/* DRAWER remains the same as previous full code... */}
+      {/* DRAWER */}
       {drawerOpen && (
         <div
           style={{
@@ -613,14 +605,15 @@ export function MenuManagementPage() {
           <div
             style={{
               width: "440px",
-              height: "100%",
+              height: "100vh",
               background: "var(--bg-surface)",
               boxShadow: "var(--shadow-flyout)",
               display: "flex",
               flexDirection: "column",
-              overflowY: "auto",
+              overflowY: "hidden",
             }}
           >
+            {/* Header — pinned */}
             <div
               style={{
                 display: "flex",
@@ -628,6 +621,7 @@ export function MenuManagementPage() {
                 alignItems: "center",
                 padding: "1.25rem 1.5rem",
                 borderBottom: "1px solid var(--zinc-200)",
+                flexShrink: 0,
               }}
             >
               <h3
@@ -647,6 +641,8 @@ export function MenuManagementPage() {
                 <X size={16} />
               </button>
             </div>
+
+            {/* Body — scrolls */}
             <div
               style={{
                 padding: "1.5rem",
@@ -654,6 +650,7 @@ export function MenuManagementPage() {
                 flexDirection: "column",
                 gap: "1.25rem",
                 flex: 1,
+                overflowY: "auto",
               }}
             >
               <div className="form-stack">
@@ -689,7 +686,7 @@ export function MenuManagementPage() {
               >
                 <div className="form-stack">
                   <label>
-                    <span>Price ($) *</span>
+                    <span>Price ($)</span>
                     <input
                       type="number"
                       step="0.01"
@@ -864,12 +861,15 @@ export function MenuManagementPage() {
               </div>
               {saveError && <p className="error-text">{saveError}</p>}
             </div>
+
+            {/* Footer — pinned */}
             <div
               style={{
                 padding: "1.25rem 1.5rem",
                 borderTop: "1px solid var(--zinc-200)",
                 display: "flex",
                 gap: "0.75rem",
+                flexShrink: 0,
               }}
             >
               <button

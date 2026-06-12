@@ -3203,15 +3203,47 @@ export function AdminPage() {
           </button>
         ))}
       </div>
-      <p
-        style={{
-          fontSize: "13px",
-          color: "var(--zinc-500)",
-          marginBottom: "1.25rem",
-        }}
-      >
-        {TAB_DESCRIPTIONS[activeTab]}
-      </p>
+      <div style={{ marginBottom: "1.25rem" }}>
+        <p
+          style={{
+            fontSize: "13px",
+            color: "var(--zinc-500)",
+            marginBottom: "0.5rem",
+          }}
+        >
+          {TAB_DESCRIPTIONS[activeTab]}
+        </p>
+        {activeTab === "menu" && (
+          <a
+            href="/menu"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "5px",
+              fontSize: "12px",
+              color: "var(--zinc-400)",
+              textDecoration: "none",
+              letterSpacing: "0.02em",
+              borderBottom: "1px solid var(--zinc-200)",
+              paddingBottom: "1px",
+              transition: "color 0.15s ease, border-color 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "var(--zinc-700)";
+              (e.currentTarget as HTMLElement).style.borderBottomColor =
+                "var(--zinc-400)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "var(--zinc-400)";
+              (e.currentTarget as HTMLElement).style.borderBottomColor =
+                "var(--zinc-200)";
+            }}
+          >
+            For full menu management — modifiers, dietary flags, and add-ons →
+          </a>
+        )}
+      </div>
+
       {activeTab === "users" && <UsersTab onDone={handleTabDone} />}
       {activeTab === "members" && <MembersTab onDone={handleTabDone} />}
       {activeTab === "menu" && <MenuTab onDone={handleTabDone} />}
