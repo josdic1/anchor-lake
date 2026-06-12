@@ -5,7 +5,7 @@ import type {
   Booking,
   BookingStatus,
   MealType,
-} from "../../types/booking";
+} from "../../types/booking"; // Added MealType import
 import type { Order } from "../../api/orders";
 import { getOrdersByBooking } from "../../api/orders";
 import {
@@ -228,6 +228,7 @@ function AttendeeEditor({
         </ul>
       )}
 
+      {/* Add household member */}
       {householdMembers.filter((m) => !linkedMemberIds.has(m.id)).length >
         0 && (
         <div>
@@ -294,6 +295,7 @@ function AttendeeEditor({
         disabled={saving}
       />
 
+      {/* Add guest */}
       {!showAddGuest ? (
         <button
           type="button"
@@ -430,11 +432,12 @@ function AttendeeEditor({
 
 // ─── Main Panel ──────────────────────────────────────────────────────────────
 
+// 1. UPDATE THE INTERFACE
 interface EditFormState {
   booking_date: string;
   estimated_arrival: string;
   room_id: string;
-  meal_type: MealType;
+  meal_type: MealType; // Added this
   notes: string;
 }
 
@@ -449,6 +452,7 @@ export function BookingDetailPanel({
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [actionError, setActionError] = useState("");
   const [actioning, setActioning] = useState(false);
   const [showOrderEntry, setShowOrderEntry] = useState(false);
@@ -458,6 +462,8 @@ export function BookingDetailPanel({
     null,
   );
   const [editing, setEditing] = useState(false);
+
+  // 1. APPLY INTERFACE TO STATE
   const [editForm, setEditForm] = useState<EditFormState>({
     booking_date: "",
     estimated_arrival: "",
@@ -471,6 +477,7 @@ export function BookingDetailPanel({
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
+  // Reload booking + attendees + actions from backend
   const reloadBooking = async () => {
     try {
       const data = await getBookingFull(bookingId);
@@ -499,11 +506,14 @@ export function BookingDetailPanel({
   }, [bookingId]);
 
   const loadOrders = async () => {
+    setLoadingOrders(true);
     try {
       const data = await getOrdersByBooking(bookingId);
       setOrders(data);
     } catch {
       // silent
+    } finally {
+      setLoadingOrders(false);
     }
   };
 
@@ -586,13 +596,14 @@ export function BookingDetailPanel({
     : "";
   const hasNoMembers = attendees.filter((a) => a.linked_member_id).length === 0;
 
+  // 2. INITIALIZE STATE WITH MEAL TYPE
   function startEditing() {
     if (!booking) return;
     setEditForm({
       booking_date: booking.booking_date,
       estimated_arrival: booking.estimated_arrival?.slice(0, 5) ?? "",
       room_id: String(booking.room_id),
-      meal_type: booking.meal_type,
+      meal_type: booking.meal_type, // Added this
       notes: booking.notes ?? "",
     });
     setEditing(true);
@@ -615,6 +626,7 @@ export function BookingDetailPanel({
       if (editForm.room_id !== String(booking.room_id))
         payload.room_id = Number(editForm.room_id);
       if (editForm.meal_type !== booking.meal_type)
+        // Added this check
         payload.meal_type = editForm.meal_type;
       if ((editForm.notes ?? "") !== (booking.notes ?? ""))
         payload.notes = editForm.notes || null;
@@ -759,6 +771,7 @@ export function BookingDetailPanel({
                   }}
                 />
               </div>
+              {/* 3. UPDATED MEAL TYPE SELECT */}
               <div>
                 <label
                   style={{
@@ -950,11 +963,17 @@ export function BookingDetailPanel({
                 </button>
               )}
             </div>
-            <OrderSummary
-              orders={orders}
-              editable={isEditable}
-              onChanged={loadOrders}
-            />
+            {loadingOrders ? (
+              <div style={{ fontSize: "13px", color: "var(--zinc-500)" }}>
+                Loading orders...
+              </div>
+            ) : (
+              <OrderSummary
+                orders={orders}
+                editable={isEditable}
+                onChanged={loadOrders}
+              />
+            )}
           </div>
 
           {confirmCancel && (
