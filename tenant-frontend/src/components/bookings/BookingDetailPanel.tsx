@@ -377,6 +377,26 @@ function AttendeeEditor({
               );
             })}
           </div>
+          {guestForm.dietary_flags.includes("OTHER") && (
+            <input
+              type="text"
+              placeholder="Describe dietary restriction..."
+              value={guestForm.dietary_other_note}
+              onChange={(e) =>
+                setGuestForm({
+                  ...guestForm,
+                  dietary_other_note: e.target.value,
+                })
+              }
+              style={{
+                padding: "6px 8px",
+                border: "1px solid var(--zinc-300)",
+                borderRadius: "4px",
+                fontSize: "13px",
+                width: "100%",
+              }}
+            />
+          )}
           <div style={{ display: "flex", gap: "8px" }}>
             <button
               className="btn-primary"
