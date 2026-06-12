@@ -474,11 +474,12 @@ export function BookingDetailPanel({
     setLoading(true);
     setConfirmCancel(false);
     setPendingAction(null);
-    getBookingFull(bookingId)
-      .then((data) => {
+    Promise.all([getBookingFull(bookingId), getOrdersByBooking(bookingId)])
+      .then(([data, ordersData]) => {
         setBooking(data.booking);
         setAttendees(data.attendees);
         setAllowedActions(data.allowed_actions);
+        setOrders(ordersData);
       })
       .catch(() => setBooking(null))
       .finally(() => setLoading(false));
@@ -495,10 +496,6 @@ export function BookingDetailPanel({
       setLoadingOrders(false);
     }
   };
-
-  useEffect(() => {
-    loadOrders();
-  }, [bookingId]);
 
   async function handleAction(action: AllowedAction) {
     if (!booking) return;
