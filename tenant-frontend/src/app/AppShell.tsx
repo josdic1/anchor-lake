@@ -120,7 +120,7 @@ export function AppShell({ children }: AppShellProps) {
             </Can>
             <Can roles={["member"]}>
               <NavLink id="nav-household" to="/household" className={navLink}>
-                My Household
+                Your Household
               </NavLink>
             </Can>
             <Can roles={["member"]}>
