@@ -25,8 +25,8 @@ def get_order_or_404(cur, order_id: int):
 
 def write_audit(cur, entity_type: str, entity_id: int, action: str, performed_by: int, old_value=None, new_value=None, notes=None):
     cur.execute("""
-        INSERT INTO audit_log (entity_type, entity_id, action, old_value, new_value, performed_by, notes)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO audit_log (entity_type, entity_id, action, old_value, new_value, performed_by, notes, performed_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
     """, (
         entity_type, entity_id, action,
         json.dumps(old_value) if old_value else None,
