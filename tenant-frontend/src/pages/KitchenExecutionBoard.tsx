@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import {
   getKitchenIncoming,
@@ -25,15 +25,93 @@ interface KitchenColumnProps {
   onRefresh?: () => void;
 }
 
+type AudioWindow = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
+
 export function KitchenExecutionBoard() {
   const [incoming, setIncoming] = useState<Order[]>([]);
   const [inKitchen, setInKitchen] = useState<Order[]>([]);
   const [ready, setReady] = useState<Order[]>([]);
   const [menuMap, setMenuMap] = useState<Record<number, string>>({});
   const [roomMap, setRoomMap] = useState<Record<number, string>>({});
+  const [soundEnabled, setSoundEnabled] = useState(false);
+
   const { user } = useAuth();
   const isKitchenOnly = user?.sub_role === "kitchen";
   const isAdmin = user?.role === "admin";
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const soundEnabledRef = useRef(false);
+  const hasLoadedKitchenOnceRef = useRef(false);
+  const knownInKitchenIdsRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
+
+  async function getAudioContext() {
+    const AudioContextConstructor =
+      window.AudioContext || (window as AudioWindow).webkitAudioContext;
+
+    if (!AudioContextConstructor) {
+      return null;
+    }
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextConstructor();
+    }
+
+    if (audioContextRef.current.state === "suspended") {
+      await audioContextRef.current.resume();
+    }
+
+    return audioContextRef.current;
+  }
+
+  async function playKitchenSound() {
+    try {
+      const ctx = await getAudioContext();
+
+      if (!ctx) {
+        return;
+      }
+
+      const now = ctx.currentTime;
+
+      const makeBeep = (start: number, frequency: number) => {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(frequency, start);
+
+        gain.gain.setValueAtTime(0.001, start);
+        gain.gain.exponentialRampToValueAtTime(0.32, start + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.32);
+
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+
+        oscillator.start(start);
+        oscillator.stop(start + 0.35);
+      };
+
+      makeBeep(now, 880);
+      makeBeep(now + 0.18, 1175);
+    } catch (err) {
+      console.error("Failed to play kitchen sound", err);
+    }
+  }
+
+  async function enableKitchenSound() {
+    await getAudioContext();
+    setSoundEnabled(true);
+
+    // Confirmation ding so staff know browser audio is enabled.
+    await playKitchenSound();
+  }
 
   const loadOrders = async () => {
     try {
@@ -42,9 +120,24 @@ export function KitchenExecutionBoard() {
         getKitchenInKitchen(),
         getKitchenReady(),
       ]);
+
+      const nextInKitchenIds = new Set(ink.map((order) => order.id));
+
+      const hasNewOrderInKitchen =
+        hasLoadedKitchenOnceRef.current &&
+        soundEnabledRef.current &&
+        ink.some((order) => !knownInKitchenIdsRef.current.has(order.id));
+
+      knownInKitchenIdsRef.current = nextInKitchenIds;
+      hasLoadedKitchenOnceRef.current = true;
+
       setIncoming(inc);
       setInKitchen(ink);
       setReady(rdy);
+
+      if (hasNewOrderInKitchen) {
+        void playKitchenSound();
+      }
     } catch (err) {
       console.error("Failed to load kitchen orders", err);
     }
@@ -54,15 +147,19 @@ export function KitchenExecutionBoard() {
     Promise.all([getMenuItems(), roomsApi.get<Room[]>("/rooms")])
       .then(([menuItems, roomsRes]) => {
         const mmap: Record<number, string> = {};
-        menuItems.forEach((m) => {
-          mmap[m.id] = m.name;
+
+        menuItems.forEach((menuItem) => {
+          mmap[menuItem.id] = menuItem.name;
         });
+
         setMenuMap(mmap);
 
         const rmap: Record<number, string> = {};
-        roomsRes.data.forEach((r) => {
-          rmap[r.id] = r.name;
+
+        roomsRes.data.forEach((room) => {
+          rmap[room.id] = room.name;
         });
+
         setRoomMap(rmap);
       })
       .catch((err) => console.error("Failed to load menu/rooms", err));
@@ -70,7 +167,9 @@ export function KitchenExecutionBoard() {
 
   useEffect(() => {
     loadOrders();
+
     const interval = setInterval(loadOrders, 5000);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -97,6 +196,22 @@ export function KitchenExecutionBoard() {
 
   return (
     <div className="service-board fade-in">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: "12px",
+        }}
+      >
+        <button
+          type="button"
+          className={soundEnabled ? "btn-primary" : "btn-ghost"}
+          onClick={enableKitchenSound}
+        >
+          {soundEnabled ? "Kitchen sound enabled" : "Enable kitchen sound"}
+        </button>
+      </div>
+
       <div className="service-grid">
         <KitchenColumn
           title="INCOMING"
@@ -108,6 +223,7 @@ export function KitchenExecutionBoard() {
           isAdmin={isAdmin}
           onRefresh={loadOrders}
         />
+
         <KitchenColumn
           title="IN KITCHEN"
           orders={inKitchen}
@@ -119,6 +235,7 @@ export function KitchenExecutionBoard() {
           isAdmin={isAdmin}
           onRefresh={loadOrders}
         />
+
         <KitchenColumn
           title="READY"
           orders={ready}
@@ -153,6 +270,7 @@ function KitchenColumn({
         style={highlight ? { background: highlight } : undefined}
       >
         {title}
+
         <span
           style={{
             marginLeft: "8px",
@@ -164,6 +282,7 @@ function KitchenColumn({
           ({orders.length})
         </span>
       </h3>
+
       <div className="column-content">
         {orders.map((order) => (
           <KitchenCard
@@ -177,6 +296,7 @@ function KitchenColumn({
             onAction={onRefresh}
           />
         ))}
+
         {orders.length === 0 && (
           <div
             style={{
